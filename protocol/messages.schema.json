@@ -1,0 +1,506 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "clientMessage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.hello"
+            },
+            "protocol": {
+              "type": "number",
+              "const": 1
+            },
+            "bootNonce": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{22,86}$"
+            },
+            "signingPublicKey": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+            },
+            "encryptionPublicKey": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+            },
+            "claims": {
+              "type": "object",
+              "properties": {
+                "git": {
+                  "type": "object",
+                  "properties": {
+                    "repository": {
+                      "type": "string",
+                      "pattern": "^[\\x21-\\x7E]{1,512}$"
+                    },
+                    "commit": {
+                      "type": "string",
+                      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                    }
+                  },
+                  "required": ["repository", "commit"],
+                  "additionalProperties": false
+                },
+                "oci": {
+                  "type": "object",
+                  "properties": {
+                    "repository": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9._:/-]{0,254}$"
+                    },
+                    "digest": {
+                      "type": "string",
+                      "pattern": "^sha256:[0-9a-f]{64}$"
+                    }
+                  },
+                  "required": ["repository", "digest"],
+                  "additionalProperties": false
+                },
+                "provider": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                    },
+                    "deploymentId": {
+                      "type": "string",
+                      "pattern": "^[\\x21-\\x7E]{1,128}$"
+                    },
+                    "region": {
+                      "type": "string",
+                      "pattern": "^[\\x21-\\x7E]{1,64}$"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "evidence": {
+              "maxItems": 32,
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "signed-build-manifest-v1"
+                      },
+                      "manifest": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "number",
+                            "const": 1
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "repository": {
+                                "type": "string",
+                                "pattern": "^[\\x21-\\x7E]{1,512}$"
+                              },
+                              "commit": {
+                                "type": "string",
+                                "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+                              }
+                            },
+                            "required": ["repository", "commit"],
+                            "additionalProperties": false
+                          },
+                          "artifact": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "oci"
+                              },
+                              "repository": {
+                                "type": "string",
+                                "pattern": "^[a-z0-9][a-z0-9._:/-]{0,254}$"
+                              },
+                              "digest": {
+                                "type": "string",
+                                "pattern": "^sha256:[0-9a-f]{64}$"
+                              }
+                            },
+                            "required": ["type", "repository", "digest"],
+                            "additionalProperties": false
+                          },
+                          "builder": {
+                            "type": "string",
+                            "pattern": "^[\\x20-\\x7E]{1,128}$"
+                          },
+                          "issuedAt": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+                          }
+                        },
+                        "required": ["version", "source", "artifact", "builder", "issuedAt"],
+                        "additionalProperties": false
+                      },
+                      "signature": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{85}[AQgw]$"
+                      },
+                      "signerFingerprint": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      }
+                    },
+                    "required": ["type", "manifest", "signature", "signerFingerprint"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+                      }
+                    },
+                    "required": ["type"],
+                    "additionalProperties": {}
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "type",
+            "protocol",
+            "bootNonce",
+            "signingPublicKey",
+            "encryptionPublicKey",
+            "claims",
+            "evidence"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.resume"
+            },
+            "protocol": {
+              "type": "number",
+              "const": 1
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            }
+          },
+          "required": ["type", "protocol", "bootId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.challenge-response"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "signature": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{85}[AQgw]$"
+            }
+          },
+          "required": ["type", "bootId", "signature"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.received"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "payloadDigest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "required": ["type", "bootId", "payloadDigest"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "serverMessage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.pending"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "expiresAt": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          },
+          "required": ["type", "bootId", "expiresAt"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.challenge"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "challenge": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+            }
+          },
+          "required": ["type", "bootId", "challenge"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.resumed"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["PENDING", "APPROVED", "DELIVERED"]
+            },
+            "expiresAt": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            }
+          },
+          "required": ["type", "bootId", "status", "expiresAt"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.approved"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "projectId": {
+              "type": "string",
+              "pattern": "^proj_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "environmentId": {
+              "type": "string",
+              "pattern": "^env_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "environmentKeyVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "payloadExpiresAt": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+            },
+            "keyEnvelope": {
+              "type": "object",
+              "properties": {
+                "serverPublicKey": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+                },
+                "salt": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+                },
+                "nonce": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{16}$"
+                },
+                "ciphertext": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_-]{64}$"
+                }
+              },
+              "required": ["serverPublicKey", "salt", "nonce", "ciphertext"],
+              "additionalProperties": false
+            },
+            "secrets": {
+              "maxItems": 4096,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^sec_[0-9A-HJKMNP-TV-Z]{26}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[A-Z_][A-Z0-9_]{0,255}$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "envKeyVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "nonce": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{16}$"
+                  },
+                  "ciphertext": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]{22,87404}$"
+                  }
+                },
+                "required": ["id", "name", "version", "envKeyVersion", "nonce", "ciphertext"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "type",
+            "bootId",
+            "projectId",
+            "environmentId",
+            "environmentKeyVersion",
+            "payloadExpiresAt",
+            "keyEnvelope",
+            "secrets"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.declined"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 256
+            }
+          },
+          "required": ["type", "bootId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.expired"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            }
+          },
+          "required": ["type", "bootId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.canceled"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 256
+            }
+          },
+          "required": ["type", "bootId", "reason"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.consumed"
+            },
+            "bootId": {
+              "type": "string",
+              "pattern": "^boot_[0-9A-HJKMNP-TV-Z]{26}$"
+            }
+          },
+          "required": ["type", "bootId"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boot.error"
+            },
+            "code": {
+              "type": "number",
+              "enum": [4400, 4401, 4403, 4404, 4409, 4410, 4429]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "required": ["type", "code", "message"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "required": ["clientMessage", "serverMessage"],
+  "additionalProperties": false,
+  "title": "env-vault bootstrap protocol v1",
+  "description": "Frames exchanged on GET /bootstrap/v1. clientMessage holds every frame a bootstrap client may send, serverMessage every frame the server may send. Generated from packages/protocol; edit the zod schemas, not this file."
+}

@@ -1,0 +1,242 @@
+{
+  "description": "Text frames for the env-vault bootstrap protocol v1. Each vector holds the exact frame text, the direction it travels, and whether a conforming parser must accept it. Invalid vectors name the reason they must be rejected. The bootstrap token is sent in the Authorization header, so it is not a frame and has no vector here.",
+  "vectors": [
+    {
+      "name": "boot.hello with git, oci and provider claims plus one signed build manifest",
+      "direction": "client",
+      "valid": true,
+      "frame": "{\"type\":\"boot.hello\",\"protocol\":1,\"bootNonce\":\"ERgfJi00O0JJUFdeZWxzeg\",\"signingPublicKey\":\"AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vsXM09o\",\"encryptionPublicKey\":\"KC82PURLUllgZ251fIOKkZifpq20u8LJ0Nfe5ezz-gE\",\"claims\":{\"git\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"oci\":{\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"provider\":{\"name\":\"zeabur\",\"deploymentId\":\"dep-1234\",\"region\":\"ap-southeast\"}},\"evidence\":[{\"type\":\"signed-build-manifest-v1\",\"manifest\":{\"version\":1,\"source\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"artifact\":{\"type\":\"oci\",\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"builder\":\"acme-ci\",\"issuedAt\":\"2026-09-05T10:00:00.000Z\"},\"signature\":\"BQwTGiEoLzY9REtSWWBnbnV8g4qRmJ-mrbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vg\",\"signerFingerprint\":\"907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2\"}]}"
+    },
+    {
+      "name": "boot.hello with no claims and unknown evidence kept verbatim",
+      "direction": "client",
+      "valid": true,
+      "frame": "{\"type\":\"boot.hello\",\"protocol\":1,\"bootNonce\":\"ERgfJi00O0JJUFdeZWxzeg\",\"signingPublicKey\":\"AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vsXM09o\",\"encryptionPublicKey\":\"KC82PURLUllgZ251fIOKkZifpq20u8LJ0Nfe5ezz-gE\",\"claims\":{},\"evidence\":[{\"type\":\"zeabur-metadata-v9\",\"payload\":{\"deployment\":\"dep-1234\"}}]}"
+    },
+    {
+      "name": "boot.resume after a dropped connection",
+      "direction": "client",
+      "valid": true,
+      "frame": "{\"type\":\"boot.resume\",\"protocol\":1,\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\"}"
+    },
+    {
+      "name": "boot.challenge-response proving boot key ownership",
+      "direction": "client",
+      "valid": true,
+      "frame": "{\"type\":\"boot.challenge-response\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"signature\":\"BQwTGiEoLzY9REtSWWBnbnV8g4qRmJ-mrbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vg\"}"
+    },
+    {
+      "name": "boot.received acknowledging the delivered payload",
+      "direction": "client",
+      "valid": true,
+      "frame": "{\"type\":\"boot.received\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"payloadDigest\":\"3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c\"}"
+    },
+    {
+      "name": "boot.pending waiting for an approval decision",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.pending\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"expiresAt\":\"2026-09-05T10:30:00.000Z\"}"
+    },
+    {
+      "name": "boot.challenge issued in response to a resume",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.challenge\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"challenge\":\"qrG4v8bN1Nvi6fD3_gUMExohKC82PURLUllgZ251fIM\"}"
+    },
+    {
+      "name": "boot.resumed on an approved boot",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.resumed\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"status\":\"APPROVED\",\"expiresAt\":\"2026-09-05T10:35:00.000Z\"}"
+    },
+    {
+      "name": "boot.approved carrying the key envelope and one secret",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.approved\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"projectId\":\"proj_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentId\":\"env_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentKeyVersion\":1,\"payloadExpiresAt\":\"2026-09-05T10:35:00.000Z\",\"keyEnvelope\":{\"serverPublicKey\":\"WmFob3Z9hIuSmaCnrrW8w8rR2N_m7fT7AgkQFx4lLDM\",\"salt\":\"gomQl56lrLO6wcjP1t3k6_L5AAcOFRwjKjE4P0ZNVFs\",\"nonce\":\"AwoRGB8mLTQ7QklQ\",\"ciphertext\":\"yM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqGor7a9xMvS2eDn7vX8AwoR\"},\"secrets\":[{\"id\":\"sec_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"name\":\"DATABASE_URL\",\"version\":3,\"envKeyVersion\":1,\"nonce\":\"PENKUVhfZm10e4KJ\",\"ciphertext\":\"CxIZICcuNTxDSlFYX2ZtdHuCiZCXnqWss7rByM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqGor7a9xA\"}]}"
+    },
+    {
+      "name": "boot.declined with a reason",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.declined\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"reason\":\"unrecognised commit\"}"
+    },
+    {
+      "name": "boot.declined without a reason",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.declined\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\"}"
+    },
+    {
+      "name": "boot.expired after the pending TTL elapsed",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.expired\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\"}"
+    },
+    {
+      "name": "boot.canceled after the bootstrap token was revoked",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.canceled\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"reason\":\"token revoked\"}"
+    },
+    {
+      "name": "boot.consumed after a valid acknowledgement",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.consumed\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\"}"
+    },
+    {
+      "name": "boot.error for a conflicting state",
+      "direction": "server",
+      "valid": true,
+      "frame": "{\"type\":\"boot.error\",\"code\":4409,\"message\":\"boot already delivered to another key\"}"
+    },
+    {
+      "name": "signing public key is 31 bytes",
+      "direction": "client",
+      "valid": false,
+      "reason": "bad key length",
+      "frame": "{\"type\":\"boot.hello\",\"protocol\":1,\"bootNonce\":\"ERgfJi00O0JJUFdeZWxzeg\",\"signingPublicKey\":\"AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vsXM0w\",\"encryptionPublicKey\":\"KC82PURLUllgZ251fIOKkZifpq20u8LJ0Nfe5ezz-gE\",\"claims\":{\"git\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"oci\":{\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"provider\":{\"name\":\"zeabur\",\"deploymentId\":\"dep-1234\",\"region\":\"ap-southeast\"}},\"evidence\":[{\"type\":\"signed-build-manifest-v1\",\"manifest\":{\"version\":1,\"source\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"artifact\":{\"type\":\"oci\",\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"builder\":\"acme-ci\",\"issuedAt\":\"2026-09-05T10:00:00.000Z\"},\"signature\":\"BQwTGiEoLzY9REtSWWBnbnV8g4qRmJ-mrbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vg\",\"signerFingerprint\":\"907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2\"}]}"
+    },
+    {
+      "name": "envelope ciphertext is 32 bytes instead of 48",
+      "direction": "server",
+      "valid": false,
+      "reason": "bad key length",
+      "frame": "{\"type\":\"boot.approved\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"projectId\":\"proj_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentId\":\"env_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentKeyVersion\":1,\"payloadExpiresAt\":\"2026-09-05T10:35:00.000Z\",\"keyEnvelope\":{\"serverPublicKey\":\"WmFob3Z9hIuSmaCnrrW8w8rR2N_m7fT7AgkQFx4lLDM\",\"salt\":\"gomQl56lrLO6wcjP1t3k6_L5AAcOFRwjKjE4P0ZNVFs\",\"nonce\":\"AwoRGB8mLTQ7QklQ\",\"ciphertext\":\"yM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqE\"},\"secrets\":[{\"id\":\"sec_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"name\":\"DATABASE_URL\",\"version\":3,\"envKeyVersion\":1,\"nonce\":\"PENKUVhfZm10e4KJ\",\"ciphertext\":\"CxIZICcuNTxDSlFYX2ZtdHuCiZCXnqWss7rByM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqGor7a9xA\"}]}"
+    },
+    {
+      "name": "AES-GCM nonce is 16 bytes instead of 12",
+      "direction": "server",
+      "valid": false,
+      "reason": "bad nonce length",
+      "frame": "{\"type\":\"boot.approved\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"projectId\":\"proj_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentId\":\"env_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentKeyVersion\":1,\"payloadExpiresAt\":\"2026-09-05T10:35:00.000Z\",\"keyEnvelope\":{\"serverPublicKey\":\"WmFob3Z9hIuSmaCnrrW8w8rR2N_m7fT7AgkQFx4lLDM\",\"salt\":\"gomQl56lrLO6wcjP1t3k6_L5AAcOFRwjKjE4P0ZNVFs\",\"nonce\":\"AwoRGB8mLTQ7QklQV15lbA\",\"ciphertext\":\"yM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqGor7a9xMvS2eDn7vX8AwoR\"},\"secrets\":[{\"id\":\"sec_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"name\":\"DATABASE_URL\",\"version\":3,\"envKeyVersion\":1,\"nonce\":\"PENKUVhfZm10e4KJ\",\"ciphertext\":\"CxIZICcuNTxDSlFYX2ZtdHuCiZCXnqWss7rByM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqGor7a9xA\"}]}"
+    },
+    {
+      "name": "signature is 32 bytes instead of 64",
+      "direction": "client",
+      "valid": false,
+      "reason": "bad signature length",
+      "frame": "{\"type\":\"boot.challenge-response\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"signature\":\"BQwTGiEoLzY9REtSWWBnbnV8g4qRmJ-mrbS7wsnQ194\"}"
+    },
+    {
+      "name": "unknown message type",
+      "direction": "client",
+      "valid": false,
+      "reason": "unknown type",
+      "frame": "{\"type\":\"boot.goodbye\",\"protocol\":1,\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\"}"
+    },
+    {
+      "name": "server frame sent on the client channel",
+      "direction": "client",
+      "valid": false,
+      "reason": "unknown type",
+      "frame": "{\"type\":\"boot.pending\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"expiresAt\":\"2026-09-05T10:30:00.000Z\"}"
+    },
+    {
+      "name": "boot.received without payloadDigest",
+      "direction": "client",
+      "valid": false,
+      "reason": "missing field",
+      "frame": "{\"type\":\"boot.received\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\"}"
+    },
+    {
+      "name": "boot.hello without evidence",
+      "direction": "client",
+      "valid": false,
+      "reason": "missing field",
+      "frame": "{\"type\":\"boot.hello\",\"protocol\":1,\"bootNonce\":\"ERgfJi00O0JJUFdeZWxzeg\",\"signingPublicKey\":\"AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vsXM09o\",\"encryptionPublicKey\":\"KC82PURLUllgZ251fIOKkZifpq20u8LJ0Nfe5ezz-gE\",\"claims\":{\"git\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"oci\":{\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"provider\":{\"name\":\"zeabur\",\"deploymentId\":\"dep-1234\",\"region\":\"ap-southeast\"}}}"
+    },
+    {
+      "name": "boot.hello with an unexpected extra field",
+      "direction": "client",
+      "valid": false,
+      "reason": "unknown field",
+      "frame": "{\"type\":\"boot.hello\",\"protocol\":1,\"bootNonce\":\"ERgfJi00O0JJUFdeZWxzeg\",\"signingPublicKey\":\"AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vsXM09o\",\"encryptionPublicKey\":\"KC82PURLUllgZ251fIOKkZifpq20u8LJ0Nfe5ezz-gE\",\"claims\":{\"git\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"oci\":{\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"provider\":{\"name\":\"zeabur\",\"deploymentId\":\"dep-1234\",\"region\":\"ap-southeast\"}},\"evidence\":[{\"type\":\"signed-build-manifest-v1\",\"manifest\":{\"version\":1,\"source\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"artifact\":{\"type\":\"oci\",\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"builder\":\"acme-ci\",\"issuedAt\":\"2026-09-05T10:00:00.000Z\"},\"signature\":\"BQwTGiEoLzY9REtSWWBnbnV8g4qRmJ-mrbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vg\",\"signerFingerprint\":\"907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2\"}],\"environmentId\":\"env_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\"}"
+    },
+    {
+      "name": "protocol version 2",
+      "direction": "client",
+      "valid": false,
+      "reason": "wrong protocol version",
+      "frame": "{\"type\":\"boot.hello\",\"protocol\":2,\"bootNonce\":\"ERgfJi00O0JJUFdeZWxzeg\",\"signingPublicKey\":\"AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vsXM09o\",\"encryptionPublicKey\":\"KC82PURLUllgZ251fIOKkZifpq20u8LJ0Nfe5ezz-gE\",\"claims\":{\"git\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"oci\":{\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"provider\":{\"name\":\"zeabur\",\"deploymentId\":\"dep-1234\",\"region\":\"ap-southeast\"}},\"evidence\":[{\"type\":\"signed-build-manifest-v1\",\"manifest\":{\"version\":1,\"source\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"artifact\":{\"type\":\"oci\",\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"builder\":\"acme-ci\",\"issuedAt\":\"2026-09-05T10:00:00.000Z\"},\"signature\":\"BQwTGiEoLzY9REtSWWBnbnV8g4qRmJ-mrbS7wsnQ197l7PP6AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vg\",\"signerFingerprint\":\"907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2\"}]}"
+    },
+    {
+      "name": "bootId without the boot_ prefix",
+      "direction": "client",
+      "valid": false,
+      "reason": "bad identifier format",
+      "frame": "{\"type\":\"boot.resume\",\"protocol\":1,\"bootId\":\"01JQ8Z5K7N2P4R6T8V0X2Z4A6C\"}"
+    },
+    {
+      "name": "payloadDigest in uppercase hex",
+      "direction": "client",
+      "valid": false,
+      "reason": "bad digest format",
+      "frame": "{\"type\":\"boot.received\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"payloadDigest\":\"3A18F6D4B2907E5C3A18F6D4B2907E5C3A18F6D4B2907E5C3A18F6D4B2907E5C\"}"
+    },
+    {
+      "name": "timestamp without milliseconds",
+      "direction": "server",
+      "valid": false,
+      "reason": "bad timestamp format",
+      "frame": "{\"type\":\"boot.pending\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"expiresAt\":\"2026-09-05T10:30:00Z\"}"
+    },
+    {
+      "name": "secret name in lowercase",
+      "direction": "server",
+      "valid": false,
+      "reason": "bad secret name",
+      "frame": "{\"type\":\"boot.approved\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"projectId\":\"proj_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentId\":\"env_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentKeyVersion\":1,\"payloadExpiresAt\":\"2026-09-05T10:35:00.000Z\",\"keyEnvelope\":{\"serverPublicKey\":\"WmFob3Z9hIuSmaCnrrW8w8rR2N_m7fT7AgkQFx4lLDM\",\"salt\":\"gomQl56lrLO6wcjP1t3k6_L5AAcOFRwjKjE4P0ZNVFs\",\"nonce\":\"AwoRGB8mLTQ7QklQ\",\"ciphertext\":\"yM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqGor7a9xMvS2eDn7vX8AwoR\"},\"secrets\":[{\"id\":\"sec_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"name\":\"database_url\",\"version\":3,\"envKeyVersion\":1,\"nonce\":\"PENKUVhfZm10e4KJ\",\"ciphertext\":\"CxIZICcuNTxDSlFYX2ZtdHuCiZCXnqWss7rByM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqGor7a9xA\"}]}"
+    },
+    {
+      "name": "secret version zero",
+      "direction": "server",
+      "valid": false,
+      "reason": "version below 1",
+      "frame": "{\"type\":\"boot.approved\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"projectId\":\"proj_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentId\":\"env_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"environmentKeyVersion\":1,\"payloadExpiresAt\":\"2026-09-05T10:35:00.000Z\",\"keyEnvelope\":{\"serverPublicKey\":\"WmFob3Z9hIuSmaCnrrW8w8rR2N_m7fT7AgkQFx4lLDM\",\"salt\":\"gomQl56lrLO6wcjP1t3k6_L5AAcOFRwjKjE4P0ZNVFs\",\"nonce\":\"AwoRGB8mLTQ7QklQ\",\"ciphertext\":\"yM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqGor7a9xMvS2eDn7vX8AwoR\"},\"secrets\":[{\"id\":\"sec_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"name\":\"DATABASE_URL\",\"version\":0,\"envKeyVersion\":1,\"nonce\":\"PENKUVhfZm10e4KJ\",\"ciphertext\":\"CxIZICcuNTxDSlFYX2ZtdHuCiZCXnqWss7rByM_W3eTr8vkABw4VHCMqMTg_Rk1UW2JpcHd-hYyTmqGor7a9xA\"}]}"
+    },
+    {
+      "name": "signed build manifest evidence with a truncated signature",
+      "direction": "client",
+      "valid": false,
+      "reason": "bad signature length",
+      "frame": "{\"type\":\"boot.hello\",\"protocol\":1,\"bootNonce\":\"ERgfJi00O0JJUFdeZWxzeg\",\"signingPublicKey\":\"AQgPFh0kKzI5QEdOVVxjanF4f4aNlJuiqbC3vsXM09o\",\"encryptionPublicKey\":\"KC82PURLUllgZ251fIOKkZifpq20u8LJ0Nfe5ezz-gE\",\"claims\":{\"git\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"oci\":{\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"provider\":{\"name\":\"zeabur\",\"deploymentId\":\"dep-1234\",\"region\":\"ap-southeast\"}},\"evidence\":[{\"type\":\"signed-build-manifest-v1\",\"manifest\":{\"version\":1,\"source\":{\"repository\":\"github.com/acme/foo\",\"commit\":\"5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6\"},\"artifact\":{\"type\":\"oci\",\"repository\":\"ghcr.io/acme/foo\",\"digest\":\"sha256:b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4\"},\"builder\":\"acme-ci\",\"issuedAt\":\"2026-09-05T10:00:00.000Z\"},\"signature\":\"BQwTGiEoLzY9REtSWWBnbg\",\"signerFingerprint\":\"907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2907e5c3a18f6d4b2\"}]}"
+    },
+    {
+      "name": "boot.error with close code 1000",
+      "direction": "server",
+      "valid": false,
+      "reason": "close code is not an error code",
+      "frame": "{\"type\":\"boot.error\",\"code\":1000,\"message\":\"done\"}"
+    },
+    {
+      "name": "boot.resumed reporting a terminal status",
+      "direction": "server",
+      "valid": false,
+      "reason": "status not resumable",
+      "frame": "{\"type\":\"boot.resumed\",\"bootId\":\"boot_01JQ8Z5K7N2P4R6T8V0X2Z4A6C\",\"status\":\"CONSUMED\",\"expiresAt\":\"2026-09-05T10:35:00.000Z\"}"
+    },
+    {
+      "name": "frame is not JSON",
+      "direction": "client",
+      "valid": false,
+      "reason": "not JSON",
+      "frame": "{\"type\":"
+    },
+    {
+      "name": "frame is a JSON array",
+      "direction": "client",
+      "valid": false,
+      "reason": "not a JSON object",
+      "frame": "[]"
+    },
+    {
+      "name": "frame is a JSON string",
+      "direction": "server",
+      "valid": false,
+      "reason": "not a JSON object",
+      "frame": "\"boot.pending\""
+    }
+  ]
+}
