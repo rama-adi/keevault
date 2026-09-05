@@ -1,5 +1,7 @@
 # Architecture
 
+A Cloudflare Worker serves the dashboard and terminates the bootstrap WebSocket. A Durable Object, one per environment, holds the only authoritative boot state. D1 stores wrapped keys, ciphertext, and metadata, and never the master key.
+
 ## Components
 
 ```text

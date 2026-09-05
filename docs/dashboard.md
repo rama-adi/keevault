@@ -73,14 +73,14 @@ A signed-in session alone is not enough for the actions below. Each additionally
 | Rotate an environment key                     | `rotateEnvironmentKeyFn`                          | owner        | yes              |
 | Create a bootstrap token                      | `createBootstrapTokenFn`                          | admin        | yes              |
 | Revoke a bootstrap token                      | `revokeBootstrapTokenFn`                          | admin        | no               |
-| Change a token's CIDR list                    | `updateTokenCidrsFn`                              | admin        | no               |
-| Add a trusted signer                          | `addTrustedSignerFn`                              | admin        | no               |
-| Revoke a trusted signer                       | `revokeTrustedSignerFn`                           | admin        | no               |
+| Change a token's CIDR list                    | `updateTokenCidrsFn`                              | admin        | yes              |
+| Add a trusted signer                          | `addTrustedSignerFn`                              | admin        | yes              |
+| Revoke a trusted signer                       | `revokeTrustedSignerFn`                           | admin        | yes              |
 | Change an operator's role                     | `setAdministratorRoleFn`                          | owner        | yes              |
 | Create a project or environment               | `createProjectFn`, `createEnvironmentFn`          | admin        | no               |
 | Create, replace, delete a secret; import .env | `putSecretFn`, `deleteSecretFn`, `importDotenvFn` | admin        | no               |
 
-Spec section 22 lists "configure provenance" as a step-up action; in the current code that applies to changing the policy mode (`setEnvironmentPolicyFn`), but adding or revoking a trusted signer is not step-up gated. This is a gap against the spec, noted here rather than silently matched to it.
+Spec section 22 lists "configure provenance" as a step-up action. The code applies that to changing the policy mode, adding a trusted signer, revoking a trusted signer and changing token CIDRs.
 
 ## Role matrix as implemented
 
@@ -103,6 +103,6 @@ This matches the permissions table in `docs/product-specs.md` section 21, except
 
 ## What the dashboard deliberately does not do
 
-**Reveal a stored secret's value.** There is no server function that returns a decrypted secret to the browser once it has been stored, and the UI has no control for it. `MaskedSecret` renders a fixed-width mask with no toggle. The Worker is technically capable of decrypting a secret, since that capability is required to build boot payloads, but no dashboard code path exposes it. This is a deliberate reduction of accidental-disclosure surface, not a cryptographic guarantee that the Worker cannot read secrets.
+**Reveal a stored secret's value.** There is no server function that returns a decrypted secret to the browser once it has been stored, and the UI has no control for it. `MaskedSecret` renders a fixed-width mask with no toggle. The Worker is technically capable of decrypting a secret, since that capability is required to build boot payloads, but no dashboard code path exposes it. This deliberately narrows the ways a secret value could leak by accident. It is not a cryptographic guarantee that the Worker cannot read secrets.
 
 **Invite a new operator.** The settings page shows this plainly: Better Auth 1.7.2's passkey plugin can only register a credential for an already-authenticated session, so an invited account would have a user row with no way to reach its first passkey. `inviteAdmin` in `src/server/auth/setup.ts` exists as a stub that throws `"inviteAdmin is not implemented yet."`; it is not implemented in V1. Operators are added only through the first-owner setup ceremony, and additional accounts must currently be created the same way infrastructure creates the first owner, then have their role changed on `/settings`.

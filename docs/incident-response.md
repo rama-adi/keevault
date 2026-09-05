@@ -40,7 +40,7 @@ Each runbook below covers detect, contain, eradicate, recover, and what to write
 
 ## Suspected environment key exposure
 
-**Detect.** A report of anomalous decrypted secret access, a compromised Worker deployment, or any indication that the environment DEK itself, not just wrapped ciphertext, was observed in plaintext outside an authorized boot.
+**Detect.** A report of anomalous decrypted secret access, a compromised Worker deployment, or any indication that the environment DEK was observed in plaintext outside an authorized boot, rather than only wrapped ciphertext.
 
 **Contain.** Cancel any `PENDING` or `APPROVED` boot request for the affected environment to prevent further delivery under the exposed key while rotation is prepared.
 
