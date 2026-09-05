@@ -33,7 +33,7 @@ apps/control-plane/          Cloudflare Worker: TanStack Start dashboard + Bette
 packages/protocol/           @env-vault/protocol: zod schemas + TS types for every WS message, state machine, constants, canonical string builders
 packages/crypto/             @env-vault/crypto: Web Crypto implementation of the hierarchy, envelopes, tokens, fingerprints, CIDR matching
 packages/vault-store/        @env-vault/vault-store: D1 schema access layer (typed SQL over a minimal D1-shaped interface), tested against node:sqlite
-cmd/vault-bootstrap/         Go module `github.com/ramaadi/env-vault/cmd/vault-bootstrap` (go.mod lives here). main.go + internal/{vaultcrypto,protocol,client,run}
+apps/env-client/             Go module `github.com/ramaadi/env-vault/apps/env-client` (go.mod lives here; binary is still named vault-bootstrap). main.go + internal/{vaultcrypto,protocol,client,run}
 migrations/vault/            D1 vault DB migrations (0001_init.sql ...)
 migrations/auth/             D1 auth DB migrations (Better Auth generated)
 protocol/                    websocket-v1.md, messages.schema.json (generated from zod), test-vectors/
