@@ -1,0 +1,16 @@
+{
+  "description": "Ed25519 resume proof. message is the UTF-8 canonical string; signature is 64 bytes b64u.",
+  "vectors": [
+    {
+      "name": "resume proof for one boot",
+      "seed": "ERITFBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzA",
+      "publicKey": "7VSln7GsOlEjk1E2KUG4aOhaYOPXskhdgogh3Hppwnk",
+      "publicKeyFingerprint": "5eb94e50e45acc7e037d89e5e04ea91c7943a0cffc1f3735c894ed6bbbc5d46f",
+      "bootId": "boot_01K4M4X31X2Z5G9C7Q8D3E6F4G",
+      "challenge": "cHFyc3R1dnd4eXp7fH1-f4CBgoOEhYaHiImKi4yNjo8",
+      "message": "vault-resume:v1\nboot_01K4M4X31X2Z5G9C7Q8D3E6F4G\ncHFyc3R1dnd4eXp7fH1-f4CBgoOEhYaHiImKi4yNjo8",
+      "messageBytes": "dmF1bHQtcmVzdW1lOnYxCmJvb3RfMDFLNE00WDMxWDJaNUc5QzdROEQzRTZGNEcKY0hGeWMzUjFkbmQ0ZVhwN2ZIMS1mNENCZ29PRWhZYUhpSW1LaTR5TmpvOA",
+      "signature": "XYPrnelLMiAJF4IBws6I4H5BikVfqK3BVmTMbXsBp-oZDVA62KujzmMTvgwLWMn2Go5S3_INfMfkiWymuYSeDQ"
+    }
+  ]
+}

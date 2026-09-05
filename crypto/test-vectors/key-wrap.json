@@ -1,0 +1,30 @@
+{
+  "description": "Project key wrapped under the master key and environment key wrapped under the project key. wrappingKey encrypts wrappedKey with AES-256-GCM.",
+  "vectors": [
+    {
+      "name": "project key under master key",
+      "kind": "project-key",
+      "projectId": "proj_01K4M4X2ZQ0V3E9A7N6B5C4D3E",
+      "projectKeyVersion": 2,
+      "masterKeyVersion": 1,
+      "wrappingKey": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+      "wrappedKey": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8",
+      "nonce": "oKGio6Slpqeoqaqr",
+      "aad": "vault:project-key:v1\nproject=proj_01K4M4X2ZQ0V3E9A7N6B5C4D3E\nversion=2\nmaster=1",
+      "ciphertext": "xjleDmHuJJhKTK34K1fu8UCdayOmgnRbpDccvUOWSz5SpqtQGT6_lzLLr79-GvIb"
+    },
+    {
+      "name": "environment key under project key",
+      "kind": "environment-key",
+      "projectId": "proj_01K4M4X2ZQ0V3E9A7N6B5C4D3E",
+      "environmentId": "env_01K4M4X30W1Y4F8B6P7C2D5E3F",
+      "environmentKeyVersion": 4,
+      "projectKeyVersion": 2,
+      "wrappingKey": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8",
+      "wrappedKey": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+      "nonce": "sLGys7S1tre4ubq7",
+      "aad": "vault:environment-key:v1\nproject=proj_01K4M4X2ZQ0V3E9A7N6B5C4D3E\nenvironment=env_01K4M4X30W1Y4F8B6P7C2D5E3F\nversion=4\nproject_key_version=2",
+      "ciphertext": "drtoBNZmjkl6RFexT3DTecZi8MjeHcJmuB31A4l6U4DaAJriu5XbrpilAaJnMF55"
+    }
+  ]
+}

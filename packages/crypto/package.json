@@ -1,0 +1,29 @@
+{
+  "name": "@env-vault/crypto",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Web Crypto implementation of the env-vault key hierarchy, boot envelopes, tokens, fingerprints and CIDR matching.",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "vectors": "node scripts/generate-vectors.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "^7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "zod": "4.5.4"
+  }
+}

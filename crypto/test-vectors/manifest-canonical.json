@@ -1,0 +1,28 @@
+{
+  "description": "Signed build manifest v1. canonical is the key-sorted JSON with no whitespace; signedMessage is 'vault:signed-build-manifest:v1\\n' followed by canonical.",
+  "vectors": [
+    {
+      "name": "oci artifact manifest",
+      "manifest": {
+        "version": 1,
+        "source": {
+          "repository": "github.com/acme/foo",
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "artifact": {
+          "type": "oci",
+          "repository": "ghcr.io/acme/foo",
+          "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "builder": "acme-ci",
+        "issuedAt": "2026-09-05T10:00:00.000Z"
+      },
+      "canonical": "{\"artifact\":{\"digest\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"repository\":\"ghcr.io/acme/foo\",\"type\":\"oci\"},\"builder\":\"acme-ci\",\"issuedAt\":\"2026-09-05T10:00:00.000Z\",\"source\":{\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"repository\":\"github.com/acme/foo\"},\"version\":1}",
+      "signedMessage": "vault:signed-build-manifest:v1\n{\"artifact\":{\"digest\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"repository\":\"ghcr.io/acme/foo\",\"type\":\"oci\"},\"builder\":\"acme-ci\",\"issuedAt\":\"2026-09-05T10:00:00.000Z\",\"source\":{\"commit\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"repository\":\"github.com/acme/foo\"},\"version\":1}",
+      "signingSeed": "MTIzNDU2Nzg5Ojs8PT4_QEFCQ0RFRkdISUpLTE1OT1A",
+      "signingPublicKey": "bCj9BYwYyIxszir5gdLRHIUbEj7Vtpt4dnc-0JnqP4M",
+      "signerFingerprint": "bc1689f7fd6385ab887161f877c0488dddb14a877c04a91a6f37d2eb3aebf0d0",
+      "signature": "R87r7beTvBv8cjUtUKM69FEHWm0C5IeG01v3Aoo-6FUSmAnNvY_4IzPleSDfGSkucWNn1TyCdQxss-14LRwiAQ"
+    }
+  ]
+}

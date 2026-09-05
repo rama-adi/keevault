@@ -1,0 +1,29 @@
+{
+  "description": "Boot key envelope. wrapKey = HKDF-SHA256(ikm=X25519(serverPrivate, clientPublic), salt, info, 32). ciphertext = AES-256-GCM(wrapKey, nonce, environmentKey, aad=info).",
+  "vectors": [
+    {
+      "name": "environment DEK delivered to one boot",
+      "bootId": "boot_01K4M4X31X2Z5G9C7Q8D3E6F4G",
+      "environmentId": "env_01K4M4X30W1Y4F8B6P7C2D5E3F",
+      "environmentKeyVersion": 4,
+      "clientPrivateKey": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXowMTIzNDU",
+      "clientPublicKey": "W0TBJqYR7xeIpWcf4wk30YbxK-Lhjy1uam7Mj9qfy2M",
+      "clientPublicKeyFingerprint": "43778c06337fa7f670a74188de83771461487b277ba5c7dbff54ad12547d53e7",
+      "serverPrivateKey": "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVphYmNkZWY",
+      "serverPublicKey": "zip8iXGO0-VKw5WsurW59Rf4DZCJYplkLp7W8oWweHA",
+      "serverPublicKeyFingerprint": "596a663f9d351c15a7d9364d20d424267aa8752b3c5675c88efba5dfbd1f7fef",
+      "salt": "Dw4NDAsKCQgHBgUEAwIBABAREhMUFRYXGBkaGxwdHh8",
+      "nonce": "ESIzRFVmd4iZqrvM",
+      "info": "vault:boot-envelope:v1\nboot=boot_01K4M4X31X2Z5G9C7Q8D3E6F4G\nenvironment=env_01K4M4X30W1Y4F8B6P7C2D5E3F\nenv_key_version=4\nclient=43778c06337fa7f670a74188de83771461487b277ba5c7dbff54ad12547d53e7\nserver=596a663f9d351c15a7d9364d20d424267aa8752b3c5675c88efba5dfbd1f7fef",
+      "wrapKey": "um6nxsxy171dpQiq9pVN-XZNsS2H3UHFS1iUV6TAQUQ",
+      "environmentKey": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8",
+      "ciphertext": "A-iFgwh0VZKmr57Ja-8rVbUVI4V6PpaD_EiIYxsk2uuOHxXF7lCMBUY2waiXTO73",
+      "keyEnvelope": {
+        "serverPublicKey": "zip8iXGO0-VKw5WsurW59Rf4DZCJYplkLp7W8oWweHA",
+        "salt": "Dw4NDAsKCQgHBgUEAwIBABAREhMUFRYXGBkaGxwdHh8",
+        "nonce": "ESIzRFVmd4iZqrvM",
+        "ciphertext": "A-iFgwh0VZKmr57Ja-8rVbUVI4V6PpaD_EiIYxsk2uuOHxXF7lCMBUY2waiXTO73"
+      }
+    }
+  ]
+}

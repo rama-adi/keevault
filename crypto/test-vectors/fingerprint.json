@@ -1,0 +1,23 @@
+{
+  "description": "Key fingerprint: lowercase hex SHA-256 over the raw 32-byte public key.",
+  "vectors": [
+    {
+      "name": "client X25519 public key",
+      "key": "W0TBJqYR7xeIpWcf4wk30YbxK-Lhjy1uam7Mj9qfy2M",
+      "keyHex": "5b44c126a611ef1788a5671fe30937d186f12be2e18f2d6e6a6ecc8fda9fcb63",
+      "fingerprint": "43778c06337fa7f670a74188de83771461487b277ba5c7dbff54ad12547d53e7"
+    },
+    {
+      "name": "boot Ed25519 public key",
+      "key": "7VSln7GsOlEjk1E2KUG4aOhaYOPXskhdgogh3Hppwnk",
+      "keyHex": "ed54a59fb1ac3a51239351362941b868e85a60e3d7b2485d828821dc7a69c279",
+      "fingerprint": "5eb94e50e45acc7e037d89e5e04ea91c7943a0cffc1f3735c894ed6bbbc5d46f"
+    },
+    {
+      "name": "all-zero key",
+      "key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "keyHex": "0000000000000000000000000000000000000000000000000000000000000000",
+      "fingerprint": "66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925"
+    }
+  ]
+}

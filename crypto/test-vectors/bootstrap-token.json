@@ -1,0 +1,43 @@
+{
+  "description": "Bootstrap token parsing and hashing. secretHash is lowercase hex SHA-256 over the UTF-8 bytes of the 43-character secret. Vectors with valid=false must be rejected by the parser.",
+  "vectors": [
+    {
+      "name": "well formed token",
+      "token": "vlt_boot_01K4M4X34A5C8K2F0T1G6H9J7K.kZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7A",
+      "valid": true,
+      "tokenId": "01K4M4X34A5C8K2F0T1G6H9J7K",
+      "secret": "kZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7A",
+      "secretHash": "54c1faebb8eddf986c80276ef74658121d35bd29a462cf266549d003c3f2b72e"
+    },
+    {
+      "name": "wrong prefix",
+      "token": "vlt_bootstrap_01K4M4X34A5C8K2F0T1G6H9J7K.kZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7A",
+      "valid": false
+    },
+    {
+      "name": "missing separator",
+      "token": "vlt_boot_01K4M4X34A5C8K2F0T1G6H9J7KkZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7A",
+      "valid": false
+    },
+    {
+      "name": "token id too short",
+      "token": "vlt_boot_1K4M4X34A5C8K2F0T1G6H9J7K.kZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7A",
+      "valid": false
+    },
+    {
+      "name": "token id uses an excluded crockford letter",
+      "token": "vlt_boot_I1K4M4X34A5C8K2F0T1G6H9J7K.kZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7A",
+      "valid": false
+    },
+    {
+      "name": "secret too short",
+      "token": "vlt_boot_01K4M4X34A5C8K2F0T1G6H9J7K.ZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7A",
+      "valid": false
+    },
+    {
+      "name": "secret uses standard base64 characters",
+      "token": "vlt_boot_01K4M4X34A5C8K2F0T1G6H9J7K.kZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7+",
+      "valid": false
+    }
+  ]
+}
