@@ -211,6 +211,87 @@ func TestWrongResumeSignatureIsRejected(t *testing.T) {
 	}
 }
 
+func TestSecondApprovalWithDifferentEnvironmentIsRejected(t *testing.T) {
+	vault, server := newFakeVault(t, modeSecondApprovalDifferentEnvironment)
+	logs := &bytes.Buffer{}
+	recorder := &execRecorder{}
+
+	session, err := client.New(testConfig(t, server.URL, logs, recorder))
+	if err != nil {
+		t.Fatalf("new session: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	err = session.Run(ctx)
+	if err == nil {
+		t.Fatal("a second boot.approved for a different environmentId must fail the boot")
+	}
+	if code := client.ExitCode(err); code != client.ExitProtocol {
+		t.Errorf("exit code = %d, want %d", code, client.ExitProtocol)
+	}
+	if recorder.called {
+		t.Error("the client must never exec after an environmentId change mid-boot")
+	}
+	if _, consumed, _ := vault.state(); consumed {
+		t.Error("the vault must not report the boot consumed")
+	}
+}
+
+func TestSecondApprovalWithDifferentDigestIsRejected(t *testing.T) {
+	vault, server := newFakeVault(t, modeSecondApprovalDifferentDigest)
+	logs := &bytes.Buffer{}
+	recorder := &execRecorder{}
+
+	session, err := client.New(testConfig(t, server.URL, logs, recorder))
+	if err != nil {
+		t.Fatalf("new session: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	err = session.Run(ctx)
+	if err == nil {
+		t.Fatal("a second boot.approved with a different payload for the same boot must fail")
+	}
+	if code := client.ExitCode(err); code != client.ExitProtocol {
+		t.Errorf("exit code = %d, want %d", code, client.ExitProtocol)
+	}
+	if recorder.called {
+		t.Error("the client must never exec after a resent approval changes the payload")
+	}
+	if _, consumed, _ := vault.state(); consumed {
+		t.Error("the vault must not report the boot consumed")
+	}
+}
+
+func TestResumedConsumedExitsWithCodeFour(t *testing.T) {
+	_, server := newFakeVault(t, modeResumedConsumed)
+	logs := &bytes.Buffer{}
+	recorder := &execRecorder{}
+
+	session, err := client.New(testConfig(t, server.URL, logs, recorder))
+	if err != nil {
+		t.Fatalf("new session: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	err = session.Run(ctx)
+	if err == nil {
+		t.Fatal("a boot resumed as already consumed must fail this process")
+	}
+	if code := client.ExitCode(err); code != client.ExitExpired {
+		t.Errorf("exit code = %d, want %d", code, client.ExitExpired)
+	}
+	if !strings.Contains(err.Error(), "boot already consumed; start a new boot") {
+		t.Errorf("error = %q, want it to explain the boot is already consumed", err.Error())
+	}
+	if !strings.Contains(logs.String(), "approval already acknowledged") {
+		t.Error("the log must record that the approval was already acknowledged")
+	}
+	if recorder.called {
+		t.Error("a resumed-as-consumed boot has no payload left to exec")
+	}
+}
+
 func TestUnauthorizedUpgradeIsFatal(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

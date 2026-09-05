@@ -10,7 +10,9 @@ import (
 // ErrUnknownType is returned for a frame whose type is not part of v1.
 var ErrUnknownType = errors.New("unknown message type")
 
-var b64u = base64.RawURLEncoding
+// b64u decodes strictly: a string whose trailing slack bits are non-zero is
+// rejected, matching the TypeScript parser.
+var b64u = base64.RawURLEncoding.Strict()
 
 type envelopeType struct {
 	Type string `json:"type"`
@@ -175,7 +177,7 @@ func validateResumed(m Resumed) error {
 		return errors.New("bootId is missing")
 	}
 	switch m.Status {
-	case StatusPending, StatusApproved, StatusDelivered:
+	case StatusPending, StatusApproved, StatusDelivered, StatusConsumed:
 		return nil
 	default:
 		return fmt.Errorf("status %q is not a resumable state", m.Status)

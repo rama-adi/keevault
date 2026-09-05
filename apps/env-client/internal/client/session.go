@@ -45,6 +45,12 @@ type Session struct {
 	secrets  []run.Secret
 	acked    bool
 	consumed bool
+
+	// approvedEnvironmentID and approvedDigest pin the first accepted
+	// boot.approved so a redelivery on resume cannot silently swap the
+	// environment or the payload out from under an already-accepted boot.
+	approvedEnvironmentID string
+	approvedDigest        string
 }
 
 // New validates the configuration and generates the two ephemeral keypairs.
@@ -269,6 +275,10 @@ func (s *Session) loop(ctx context.Context, conn *websocket.Conn) error {
 				return err
 			}
 		case protocol.Resumed:
+			if m.Status == protocol.StatusConsumed {
+				s.log.Infof("approval already acknowledged")
+				return exitf(ExitExpired, "boot already consumed; start a new boot")
+			}
 			s.log.Debugf("session resumed in state %s", m.Status)
 		case protocol.Approved:
 			if err := s.handleApproved(ctx, conn, frame, m); err != nil {

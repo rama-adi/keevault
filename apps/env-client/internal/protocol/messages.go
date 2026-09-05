@@ -25,11 +25,16 @@ const (
 	TypeError     = "boot.error"
 )
 
-// Boot states reported by boot.resumed.
+// Boot states reported by boot.resumed. StatusConsumed is not part of the
+// normal reconnect flow (a consumed boot is terminal and the server should
+// close instead) but a lost acknowledgement can leave the boot consumed
+// server side while the client still believes it is pending an ack, so the
+// resume path must still be able to decode it.
 const (
 	StatusPending   = "PENDING"
 	StatusApproved  = "APPROVED"
 	StatusDelivered = "DELIVERED"
+	StatusConsumed  = "CONSUMED"
 )
 
 // WebSocket close codes.

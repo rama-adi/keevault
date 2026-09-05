@@ -31,6 +31,23 @@ func TestDecodeB64uRejectsPadding(t *testing.T) {
 	}
 }
 
+func TestDecodeB64uRejectsNonZeroSlackBits(t *testing.T) {
+	// A 43-character string decodes to 32 bytes and carries 4 slack bits in
+	// its last character. vc.EncodeB64u(make([]byte, 32)) always ends in "A",
+	// the only zero-slack-bit encoding for an all-zero input. Changing that
+	// last character to "B" keeps the string the same length but sets a
+	// slack bit no encoder would ever produce, which a strict decoder must
+	// reject even though the bytes still parse as valid base64url.
+	valid := vc.EncodeB64u(make([]byte, 32))
+	if len(valid) != 43 || !strings.HasSuffix(valid, "A") {
+		t.Fatalf("test fixture assumption broke: %q", valid)
+	}
+	tampered := strings.TrimSuffix(valid, "A") + "B"
+	if _, err := vc.DecodeB64u(tampered); err == nil {
+		t.Fatalf("a base64url string with non-zero slack bits must be rejected: %s", tampered)
+	}
+}
+
 func TestDecodeB64uLen(t *testing.T) {
 	if _, err := vc.DecodeB64uLen(vc.EncodeB64u(make([]byte, 31)), 32); err == nil {
 		t.Fatal("a short field must be rejected")

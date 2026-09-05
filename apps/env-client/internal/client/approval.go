@@ -20,6 +20,13 @@ func (s *Session) handleApproved(ctx context.Context, conn *websocket.Conn, fram
 	if m.BootID != s.bootID {
 		return exitf(ExitProtocol, "approval is for a different boot request")
 	}
+	if s.approvedEnvironmentID != "" && m.EnvironmentID != s.approvedEnvironmentID {
+		return exitf(ExitProtocol, "approval environmentId changed from %s to %s", s.approvedEnvironmentID, m.EnvironmentID)
+	}
+	digest := vaultcrypto.SHA256Hex(frame)
+	if s.approvedDigest != "" && digest != s.approvedDigest {
+		return exitf(ExitProtocol, "vault resent boot.approved with a different payload for the same boot")
+	}
 	s.log.Infof("approval received")
 
 	secrets, err := s.decrypt(m)
@@ -28,9 +35,10 @@ func (s *Session) handleApproved(ctx context.Context, conn *websocket.Conn, fram
 	}
 	s.wipeSecrets()
 	s.secrets = secrets
+	s.approvedEnvironmentID = m.EnvironmentID
+	s.approvedDigest = digest
 	s.log.Infof("environment decrypted (%d values)", len(secrets))
 
-	digest := vaultcrypto.SHA256Hex(frame)
 	if err := s.send(ctx, conn, protocol.Received{
 		Type:          protocol.TypeReceived,
 		BootID:        s.bootID,

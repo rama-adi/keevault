@@ -116,7 +116,7 @@ func TestDecodeRejectsBadFrames(t *testing.T) {
 		"short signature":     `{"type":"boot.challenge-response","bootId":"boot_01","signature":"` + b64u(63) + `"}`,
 		"short signing key":   `{"type":"boot.hello","protocol":1,"bootNonce":"` + b64u(16) + `","signingPublicKey":"` + b64u(31) + `","encryptionPublicKey":"` + b64u(32) + `"}`,
 		"short boot nonce":    `{"type":"boot.hello","protocol":1,"bootNonce":"` + b64u(15) + `","signingPublicKey":"` + b64u(32) + `","encryptionPublicKey":"` + b64u(32) + `"}`,
-		"bad resumed status":  `{"type":"boot.resumed","bootId":"boot_01","status":"CONSUMED"}`,
+		"bad resumed status":  `{"type":"boot.resumed","bootId":"boot_01","status":"DECLINED"}`,
 		"short digest":        `{"type":"boot.received","bootId":"boot_01","payloadDigest":"aa"}`,
 		"upper case digest":   `{"type":"boot.received","bootId":"boot_01","payloadDigest":"` + strings.Repeat("A", 64) + `"}`,
 		"envelope wrong size": approvedFrame(b64u(32), b64u(32), b64u(12), b64u(47)),
@@ -148,6 +148,37 @@ func TestDecodeAcceptsMinimalApproved(t *testing.T) {
 	}
 	if len(approved.Secrets) != 0 {
 		t.Fatal("an approval may carry no secrets")
+	}
+}
+
+func TestDecodeAcceptsConsumedResumedStatus(t *testing.T) {
+	frame := `{"type":"boot.resumed","bootId":"boot_01","status":"CONSUMED","expiresAt":"2026-09-05T10:00:00.000Z"}`
+	msg, err := protocol.Decode([]byte(frame))
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	resumed, ok := msg.(protocol.Resumed)
+	if !ok {
+		t.Fatalf("decoded %T, want protocol.Resumed", msg)
+	}
+	if resumed.Status != protocol.StatusConsumed {
+		t.Fatalf("status = %s, want %s", resumed.Status, protocol.StatusConsumed)
+	}
+}
+
+func TestDecodeRejectsB64uWithNonZeroSlackBits(t *testing.T) {
+	// b64u(32) ends in "A", which carries zero slack bits. Changing the last
+	// character to "B" keeps the string 43 characters long but sets a slack
+	// bit the encoder would never produce, so a strict decoder must reject
+	// it even though a lenient one would accept it.
+	valid := b64u(32)
+	if !strings.HasSuffix(valid, "A") {
+		t.Fatalf("test fixture assumption broke: b64u(32) = %s", valid)
+	}
+	tampered := strings.TrimSuffix(valid, "A") + "B"
+	challengeFrame := `{"type":"boot.challenge","bootId":"boot_01","challenge":"` + tampered + `"}`
+	if _, err := protocol.Decode([]byte(challengeFrame)); err == nil {
+		t.Fatalf("a base64url string with non-zero slack bits must be rejected: %s", tampered)
 	}
 }
 

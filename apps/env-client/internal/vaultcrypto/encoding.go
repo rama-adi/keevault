@@ -10,8 +10,10 @@ import (
 	"fmt"
 )
 
-// B64u is base64url without padding (RFC 4648 section 5).
-var B64u = base64.RawURLEncoding
+// B64u is base64url without padding (RFC 4648 section 5). Strict mode rejects
+// a string whose trailing slack bits are non-zero, matching the TypeScript
+// parser.
+var B64u = base64.RawURLEncoding.Strict()
 
 // EncodeB64u encodes bytes as unpadded base64url.
 func EncodeB64u(b []byte) string {

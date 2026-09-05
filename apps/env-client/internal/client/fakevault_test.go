@@ -26,6 +26,18 @@ const (
 	// modeWrongSignature verifies the resume proof against another key, so the
 	// proof fails and the connection is closed with 4401.
 	modeWrongSignature
+	// modeSecondApprovalDifferentEnvironment sends a first boot.approved,
+	// waits for the ack, then sends a second boot.approved for a different
+	// environmentId on the same boot. The client must reject it.
+	modeSecondApprovalDifferentEnvironment
+	// modeSecondApprovalDifferentDigest sends a first boot.approved, waits
+	// for the ack, then resends the same boot but with a different payload
+	// (so the frame bytes, and therefore the digest, differ) while the
+	// environmentId stays the same. The client must reject it.
+	modeSecondApprovalDifferentDigest
+	// modeResumedConsumed answers a resume with boot.resumed status CONSUMED,
+	// simulating a lost boot.consumed acknowledgement on a prior connection.
+	modeResumedConsumed
 )
 
 const (
@@ -227,6 +239,17 @@ func (f *fakeVault) resumed(ctx context.Context, conn *websocket.Conn) {
 	f.proofAccepted = true
 	f.mu.Unlock()
 
+	if f.mode == modeResumedConsumed {
+		_ = f.send(ctx, conn, protocol.Resumed{
+			Type:      protocol.TypeResumed,
+			BootID:    testBootID,
+			Status:    protocol.StatusConsumed,
+			ExpiresAt: time.Now().Add(5 * time.Minute).UTC().Format(rfc3339Milli),
+		})
+		conn.Close(websocket.StatusNormalClosure, "")
+		return
+	}
+
 	if err := f.send(ctx, conn, protocol.Resumed{
 		Type:      protocol.TypeResumed,
 		BootID:    testBootID,
@@ -279,6 +302,11 @@ func (f *fakeVault) resumed(ctx context.Context, conn *websocket.Conn) {
 		return
 	}
 
+	if f.mode == modeSecondApprovalDifferentEnvironment || f.mode == modeSecondApprovalDifferentDigest {
+		f.sendSecondApproved(ctx, conn, clientEncPub)
+		return
+	}
+
 	if err := f.send(ctx, conn, protocol.Consumed{Type: protocol.TypeConsumed, BootID: testBootID}); err != nil {
 		return
 	}
@@ -288,10 +316,43 @@ func (f *fakeVault) resumed(ctx context.Context, conn *websocket.Conn) {
 	conn.Close(websocket.StatusNormalClosure, "")
 }
 
+// sendSecondApproved resends a boot.approved for the boot the client already
+// accepted, either for a different environmentId or with different payload
+// bytes (so a different digest) under the same environmentId. Either shape
+// must be rejected by the client, which never acknowledges it and closes the
+// connection itself.
+func (f *fakeVault) sendSecondApproved(ctx context.Context, conn *websocket.Conn, clientEncPub []byte) {
+	environmentID := testEnvironmentID
+	expiresIn := 10 * time.Minute
+	if f.mode == modeSecondApprovalDifferentEnvironment {
+		environmentID = "env_01K4M4X30W1Y4F8B6P7C2D5E9Z"
+	}
+	second, err := f.buildApprovedFor(clientEncPub, environmentID, expiresIn)
+	if err != nil {
+		f.t.Errorf("fake vault: build second approval: %v", err)
+		return
+	}
+	if err := f.send(ctx, conn, second); err != nil {
+		return
+	}
+	// The client must reject this frame on its own and close without ever
+	// sending another boot.received. Give it a moment to do so, then let the
+	// handler return; httptest.Server tears the connection down on cleanup.
+	_, _, _ = f.read(ctx, conn)
+}
+
 const rfc3339Milli = "2006-01-02T15:04:05.000Z"
 
 // buildApproved encrypts a real environment for the client's X25519 key.
 func (f *fakeVault) buildApproved(clientEncPub []byte) (protocol.Approved, error) {
+	return f.buildApprovedFor(clientEncPub, testEnvironmentID, 5*time.Minute)
+}
+
+// buildApprovedFor is buildApproved with the environmentId and the
+// payloadExpiresAt offset made explicit, so a test can build a second
+// boot.approved for the same boot that differs from the first one either in
+// environmentId or only in payload bytes (and therefore in digest).
+func (f *fakeVault) buildApprovedFor(clientEncPub []byte, environmentID string, expiresIn time.Duration) (protocol.Approved, error) {
 	var out protocol.Approved
 	clientPub, err := vc.X25519PublicKey(clientEncPub)
 	if err != nil {
@@ -321,7 +382,7 @@ func (f *fakeVault) buildApproved(clientEncPub []byte) (protocol.Approved, error
 	if err != nil {
 		return out, err
 	}
-	info := vc.BootEnvelopeInfo(testBootID, testEnvironmentID, testEnvKeyVersion, clientFP, serverFP)
+	info := vc.BootEnvelopeInfo(testBootID, environmentID, testEnvKeyVersion, clientFP, serverFP)
 	envelope, err := vc.SealBootEnvelope(serverPriv, clientPub, salt, nonce, dek, info)
 	if err != nil {
 		return out, err
@@ -333,7 +394,7 @@ func (f *fakeVault) buildApproved(clientEncPub []byte) (protocol.Approved, error
 		if err != nil {
 			return out, err
 		}
-		aad := vc.SecretAAD(testProjectID, testEnvironmentID, s.id, s.name, s.version, testEnvKeyVersion)
+		aad := vc.SecretAAD(testProjectID, environmentID, s.id, s.name, s.version, testEnvKeyVersion)
 		ciphertext, err := vc.Seal(dek, secretNonce, []byte(s.value), aad)
 		if err != nil {
 			return out, err
@@ -351,10 +412,10 @@ func (f *fakeVault) buildApproved(clientEncPub []byte) (protocol.Approved, error
 	return protocol.Approved{
 		Type:                  protocol.TypeApproved,
 		BootID:                testBootID,
-		EnvironmentID:         testEnvironmentID,
+		EnvironmentID:         environmentID,
 		ProjectID:             testProjectID,
 		EnvironmentKeyVersion: testEnvKeyVersion,
-		PayloadExpiresAt:      time.Now().Add(5 * time.Minute).UTC().Format(rfc3339Milli),
+		PayloadExpiresAt:      time.Now().Add(expiresIn).UTC().Format(rfc3339Milli),
 		KeyEnvelope: protocol.KeyEnvelope{
 			ServerPublicKey: vc.EncodeB64u(envelope.ServerPublicKey),
 			Salt:            vc.EncodeB64u(envelope.Salt),
