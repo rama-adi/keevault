@@ -10,14 +10,30 @@
 
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as IndexRouteImport } from "./routes/index";
+import { Route as AuditIndexRouteImport } from "./routes/audit/index";
+import { Route as BootsIndexRouteImport } from "./routes/boots/index";
 import { Route as LoginPageRouteImport } from "./routes/login/page";
 import { Route as ProjectsIndexRouteImport } from "./routes/projects/index";
+import { Route as SettingsIndexRouteImport } from "./routes/settings/index";
 import { Route as SetupPageRouteImport } from "./routes/setup/page";
 import { Route as ApiAuthSplatRouteImport } from "./routes/api/auth/$";
+import { Route as BootsBootIdIndexRouteImport } from "./routes/boots/$bootId/index";
+import { Route as ProjectsProjectIdIndexRouteImport } from "./routes/projects/$projectId/index";
+import { Route as ProjectsProjectIdEnvironmentsEnvironmentIdIndexRouteImport } from "./routes/projects/$projectId/environments/$environmentId/index";
 
 const IndexRoute = IndexRouteImport.update({
   id: "/",
   path: "/",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const AuditIndexRoute = AuditIndexRouteImport.update({
+  id: "/audit/",
+  path: "/audit/",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const BootsIndexRoute = BootsIndexRouteImport.update({
+  id: "/boots/",
+  path: "/boots/",
   getParentRoute: () => rootRouteImport,
 } as any);
 const LoginPageRoute = LoginPageRouteImport.update({
@@ -30,6 +46,11 @@ const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   path: "/projects/",
   getParentRoute: () => rootRouteImport,
 } as any);
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: "/settings/",
+  path: "/settings/",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const SetupPageRoute = SetupPageRouteImport.update({
   id: "/setup/",
   path: "/setup/",
@@ -40,43 +61,117 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: "/api/auth/$",
   getParentRoute: () => rootRouteImport,
 } as any);
+const BootsBootIdIndexRoute = BootsBootIdIndexRouteImport.update({
+  id: "/boots/$bootId/",
+  path: "/boots/$bootId/",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
+  id: "/projects/$projectId/",
+  path: "/projects/$projectId/",
+  getParentRoute: () => rootRouteImport,
+} as any);
+const ProjectsProjectIdEnvironmentsEnvironmentIdIndexRoute =
+  ProjectsProjectIdEnvironmentsEnvironmentIdIndexRouteImport.update({
+    id: "/projects/$projectId/environments/$environmentId/",
+    path: "/projects/$projectId/environments/$environmentId/",
+    getParentRoute: () => rootRouteImport,
+  } as any);
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
+  "/audit/": typeof AuditIndexRoute;
+  "/boots/": typeof BootsIndexRoute;
   "/login/": typeof LoginPageRoute;
   "/projects/": typeof ProjectsIndexRoute;
+  "/settings/": typeof SettingsIndexRoute;
   "/setup/": typeof SetupPageRoute;
+  "/boots/$bootId/": typeof BootsBootIdIndexRoute;
+  "/projects/$projectId/": typeof ProjectsProjectIdIndexRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/projects/$projectId/environments/$environmentId/": typeof ProjectsProjectIdEnvironmentsEnvironmentIdIndexRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
+  "/audit": typeof AuditIndexRoute;
+  "/boots": typeof BootsIndexRoute;
   "/login": typeof LoginPageRoute;
   "/projects": typeof ProjectsIndexRoute;
+  "/settings": typeof SettingsIndexRoute;
   "/setup": typeof SetupPageRoute;
+  "/boots/$bootId": typeof BootsBootIdIndexRoute;
+  "/projects/$projectId": typeof ProjectsProjectIdIndexRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/projects/$projectId/environments/$environmentId": typeof ProjectsProjectIdEnvironmentsEnvironmentIdIndexRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
+  "/audit/": typeof AuditIndexRoute;
+  "/boots/": typeof BootsIndexRoute;
   "/login/": typeof LoginPageRoute;
   "/projects/": typeof ProjectsIndexRoute;
+  "/settings/": typeof SettingsIndexRoute;
   "/setup/": typeof SetupPageRoute;
+  "/boots/$bootId/": typeof BootsBootIdIndexRoute;
+  "/projects/$projectId/": typeof ProjectsProjectIdIndexRoute;
   "/api/auth/$": typeof ApiAuthSplatRoute;
+  "/projects/$projectId/environments/$environmentId/": typeof ProjectsProjectIdEnvironmentsEnvironmentIdIndexRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/login/" | "/projects/" | "/setup/" | "/api/auth/$";
+  fullPaths:
+    | "/"
+    | "/audit/"
+    | "/boots/"
+    | "/login/"
+    | "/projects/"
+    | "/settings/"
+    | "/setup/"
+    | "/boots/$bootId/"
+    | "/projects/$projectId/"
+    | "/api/auth/$"
+    | "/projects/$projectId/environments/$environmentId/";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/login" | "/projects" | "/setup" | "/api/auth/$";
-  id: "__root__" | "/" | "/login/" | "/projects/" | "/setup/" | "/api/auth/$";
+  to:
+    | "/"
+    | "/audit"
+    | "/boots"
+    | "/login"
+    | "/projects"
+    | "/settings"
+    | "/setup"
+    | "/boots/$bootId"
+    | "/projects/$projectId"
+    | "/api/auth/$"
+    | "/projects/$projectId/environments/$environmentId";
+  id:
+    | "__root__"
+    | "/"
+    | "/audit/"
+    | "/boots/"
+    | "/login/"
+    | "/projects/"
+    | "/settings/"
+    | "/setup/"
+    | "/boots/$bootId/"
+    | "/projects/$projectId/"
+    | "/api/auth/$"
+    | "/projects/$projectId/environments/$environmentId/";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  AuditIndexRoute: typeof AuditIndexRoute;
+  BootsIndexRoute: typeof BootsIndexRoute;
   LoginPageRoute: typeof LoginPageRoute;
   ProjectsIndexRoute: typeof ProjectsIndexRoute;
+  SettingsIndexRoute: typeof SettingsIndexRoute;
   SetupPageRoute: typeof SetupPageRoute;
+  BootsBootIdIndexRoute: typeof BootsBootIdIndexRoute;
+  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute;
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
+  ProjectsProjectIdEnvironmentsEnvironmentIdIndexRoute: typeof ProjectsProjectIdEnvironmentsEnvironmentIdIndexRoute;
 }
 
 declare module "@tanstack/react-router" {
@@ -86,6 +181,20 @@ declare module "@tanstack/react-router" {
       path: "/";
       fullPath: "/";
       preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/audit/": {
+      id: "/audit/";
+      path: "/audit";
+      fullPath: "/audit/";
+      preLoaderRoute: typeof AuditIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/boots/": {
+      id: "/boots/";
+      path: "/boots";
+      fullPath: "/boots/";
+      preLoaderRoute: typeof BootsIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/login/": {
@@ -102,6 +211,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ProjectsIndexRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/settings/": {
+      id: "/settings/";
+      path: "/settings";
+      fullPath: "/settings/";
+      preLoaderRoute: typeof SettingsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/setup/": {
       id: "/setup/";
       path: "/setup";
@@ -116,15 +232,43 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiAuthSplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/boots/$bootId/": {
+      id: "/boots/$bootId/";
+      path: "/boots/$bootId";
+      fullPath: "/boots/$bootId/";
+      preLoaderRoute: typeof BootsBootIdIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/projects/$projectId/": {
+      id: "/projects/$projectId/";
+      path: "/projects/$projectId";
+      fullPath: "/projects/$projectId/";
+      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/projects/$projectId/environments/$environmentId/": {
+      id: "/projects/$projectId/environments/$environmentId/";
+      path: "/projects/$projectId/environments/$environmentId";
+      fullPath: "/projects/$projectId/environments/$environmentId/";
+      preLoaderRoute: typeof ProjectsProjectIdEnvironmentsEnvironmentIdIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuditIndexRoute: AuditIndexRoute,
+  BootsIndexRoute: BootsIndexRoute,
   LoginPageRoute: LoginPageRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
   SetupPageRoute: SetupPageRoute,
+  BootsBootIdIndexRoute: BootsBootIdIndexRoute,
+  ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ProjectsProjectIdEnvironmentsEnvironmentIdIndexRoute:
+    ProjectsProjectIdEnvironmentsEnvironmentIdIndexRoute,
 };
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
