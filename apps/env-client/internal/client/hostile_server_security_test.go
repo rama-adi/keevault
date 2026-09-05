@@ -418,14 +418,11 @@ func TestClientRefusesASecretNameThatIsNotAPosixVariable(t *testing.T) {
 	assertRefused(t, err, recorder, "")
 }
 
-// Finding 5 in docs/security-review-v1.md. The protocol document caps a frame
-// at 1 MiB and the server enforces that on the way in, but the client sets its
-// read limit to 32 MiB, so a control plane that has been taken over can make
-// every workload that reconnects buffer 32 MiB per frame. Set the read limit in
-// session.go to the protocol's 1 MiB and delete the t.Skip below.
+// Finding 5 in docs/security-review-v1.md, now fixed. The protocol document
+// caps a frame at 1 MiB and the server enforces that on the way in. The client
+// reads at most that plus 64 KiB of slack, so an oversized frame is a protocol
+// error instead of 32 MiB the workload buffers on every reconnect.
 func TestClientRefusesAFrameLargerThanTheProtocolLimit(t *testing.T) {
-	t.Skip("finding 5: the Go client's read limit is 32 MiB, not the protocol's 1 MiB")
-
 	vault, server := newHostileVault(t, func(t *testing.T, m *mutable) []byte {
 		t.Helper()
 		frame, err := protocol.Encode(*m.approved)

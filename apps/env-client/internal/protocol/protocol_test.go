@@ -2,6 +2,7 @@ package protocol_test
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -148,6 +149,25 @@ func TestDecodeAcceptsMinimalApproved(t *testing.T) {
 	}
 	if len(approved.Secrets) != 0 {
 		t.Fatal("an approval may carry no secrets")
+	}
+}
+
+// Finding 5 in docs/security-review-v1.md. The protocol limits a payload to
+// 4096 records, so a longer list is refused before anything is decrypted.
+func TestDecodeRejectsMoreSecretsThanTheProtocolAllows(t *testing.T) {
+	records := make([]string, 0, protocol.MaxSecretsPerPayload+1)
+	for i := 0; i <= protocol.MaxSecretsPerPayload; i++ {
+		records = append(records, `{"id":"sec_`+strconv.Itoa(i)+`","name":"S`+strconv.Itoa(i)+
+			`","version":1,"envKeyVersion":1,"nonce":"`+b64u(12)+`","ciphertext":"`+b64u(48)+`"}`)
+	}
+	frame := strings.Replace(
+		approvedFrame(b64u(32), b64u(32), b64u(12), b64u(48)),
+		`"secrets":[]`,
+		`"secrets":[`+strings.Join(records, ",")+`]`,
+		1,
+	)
+	if _, err := protocol.Decode([]byte(frame)); err == nil {
+		t.Fatalf("a payload of %d records must be refused", protocol.MaxSecretsPerPayload+1)
 	}
 }
 

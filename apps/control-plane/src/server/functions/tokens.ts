@@ -81,6 +81,7 @@ export const updateTokenCidrsFn = createServerFn({ method: "POST" })
     async ({ data }): Promise<BootstrapTokenSummary> =>
       await guarded(async () => {
         const session = await requireRole("admin");
+        await requireRecentPasskey();
         return await updateTokenCidrs(vaultContextForSession(session), {
           tokenRowId: data.tokenId,
           allowedCidrs: data.allowedCidrs,
@@ -111,6 +112,7 @@ export const addTrustedSignerFn = createServerFn({ method: "POST" })
     async ({ data }): Promise<TrustedSignerSummary> =>
       await guarded(async () => {
         const session = await requireRole("admin");
+        await requireRecentPasskey();
         return await addTrustedSigner(vaultContextForSession(session), data);
       }),
   );
@@ -121,6 +123,7 @@ export const revokeTrustedSignerFn = createServerFn({ method: "POST" })
     async ({ data }): Promise<{ revoked: true }> =>
       await guarded(async () => {
         const session = await requireRole("admin");
+        await requireRecentPasskey();
         await revokeTrustedSigner(vaultContextForSession(session), data);
         return { revoked: true };
       }),

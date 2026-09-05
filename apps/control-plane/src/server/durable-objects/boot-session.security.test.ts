@@ -27,7 +27,12 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { createTestVault } from "../bootstrap/test-vault.ts";
 import { summaryDigest, V1_VERIFIERS } from "../provenance/index.ts";
 import type { UnwrappedEnvironmentDek } from "../vault/keys.ts";
-import { BootSessionCore, type BootIdentity } from "./boot-session-core.ts";
+import {
+  BOOT_RATE_WINDOW_SECONDS,
+  BootSessionCore,
+  MAX_BOOTS_PER_SOURCE,
+  type BootIdentity,
+} from "./boot-session-core.ts";
 import { FakeConnection, FakeSocketRegistry, fromNodeSqliteStorage } from "./test-support.ts";
 
 /**
@@ -36,8 +41,9 @@ import { FakeConnection, FakeSocketRegistry, fromNodeSqliteStorage } from "./tes
  * The transition tests next door drive the happy paths and the single-actor
  * refusals. This file drives the cases where two actors race, where a clock has
  * moved on behind the object's back, and where a revocation has to reach a boot
- * that is already in flight. Three of them are marked `it.fails` and name the
- * finding in docs/security-review-v1.md that they are waiting on.
+ * that is already in flight. Every case here passes; the ones that name a
+ * finding in docs/security-review-v1.md were written against the defect and go
+ * red again if it comes back.
  */
 
 const START = Date.parse("2026-09-05T10:00:00.000Z");
@@ -61,6 +67,49 @@ async function bootKeys(): Promise<BootKeys> {
   };
 }
 
+/**
+ * A one-shot pause the first `unwrapDek` call waits on. It lets a test start
+ * one approval, park it inside the awaits that run before the transition, and
+ * run a second approval to completion in the gap.
+ */
+interface Gate {
+  arm(): void;
+  readonly reached: Promise<void>;
+  release(): void;
+  pass(): Promise<void>;
+}
+
+function createGate(): Gate {
+  let releaseHold = (): void => undefined;
+  let markReached = (): void => undefined;
+  const released = new Promise<void>((resolve) => {
+    releaseHold = (): void => {
+      resolve();
+    };
+  });
+  const reached = new Promise<void>((resolve) => {
+    markReached = (): void => {
+      resolve();
+    };
+  });
+  let armed = false;
+  return {
+    arm(): void {
+      armed = true;
+    },
+    reached,
+    release(): void {
+      releaseHold();
+    },
+    async pass(): Promise<void> {
+      if (!armed) return;
+      armed = false;
+      markReached();
+      await released;
+    },
+  };
+}
+
 interface Harness {
   db: VaultDatabase;
   sockets: FakeSocketRegistry;
@@ -71,6 +120,7 @@ interface Harness {
   identity: BootIdentity;
   secondIdentity: BootIdentity;
   clock: { now: number };
+  gate: Gate;
   core: BootSessionCore;
 }
 
@@ -121,6 +171,7 @@ async function createHarness(): Promise<Harness> {
   const storage = new DatabaseSync(":memory:");
   const sockets = new FakeSocketRegistry();
   const clock = { now: START };
+  const gate = createGate();
   const dek = randomBytes(32);
 
   const core = new BootSessionCore({
@@ -131,8 +182,10 @@ async function createHarness(): Promise<Harness> {
     newBootId: () => generatePrefixedUlid("boot"),
     newAuditId: () => generatePrefixedUlid("aud"),
     randomChallenge: () => generateResumeChallenge(),
-    unwrapDek: (): Promise<UnwrappedEnvironmentDek> =>
-      Promise.resolve({ projectId, dek, version: 1 }),
+    unwrapDek: async (): Promise<UnwrappedEnvironmentDek> => {
+      await gate.pass();
+      return { projectId, dek, version: 1 };
+    },
     sockets: { forBoot: (bootId: string) => sockets.forBoot(bootId) },
     scheduleAlarm: () => undefined,
     verifiers: V1_VERIFIERS,
@@ -148,6 +201,7 @@ async function createHarness(): Promise<Harness> {
     identity: { tokenId, sourceIp: "203.0.113.42", maxPendingBoots: 3 },
     secondIdentity: { tokenId: secondTokenId, sourceIp: "198.51.100.9", maxPendingBoots: 3 },
     clock,
+    gate,
     core,
   };
 }
@@ -256,12 +310,10 @@ describe("two administrators approve the same boot at once", () => {
     harness = await createHarness();
   });
 
-  // Finding 1 in docs/security-review-v1.md. `approve` reads the boot row
-  // before it awaits D1, the verifiers and the key unwrap, then applies the
-  // transition against that stale snapshot, so two overlapping calls both see
-  // PENDING. Re-read the row and re-check PENDING immediately before the
-  // transition, with no await in between, and this test goes green.
-  it.fails("lets one approval win and answers the other with a conflict", async () => {
+  // Finding 1 in docs/security-review-v1.md, now fixed: `approve` re-reads the
+  // boot row and applies the transition with no await in between, so the second
+  // of two overlapping approvals sees APPROVED and reports a conflict.
+  it("lets one approval win and answers the other with a conflict", async () => {
     const keys = await bootKeys();
     const { bootId } = await startBoot(harness, keys);
 
@@ -280,7 +332,7 @@ describe("two administrators approve the same boot at once", () => {
   // Same finding, seen from the client's side: the losing approval overwrites
   // the stored frame and its digest, so the payload the client already holds no
   // longer matches what the object will accept as an acknowledgement.
-  it.fails("keeps the delivered frame and the stored digest in agreement", async () => {
+  it("keeps the delivered frame and the stored digest in agreement", async () => {
     const keys = await bootKeys();
     const { connection, bootId } = await startBoot(harness, keys);
 
@@ -299,6 +351,26 @@ describe("two administrators approve the same boot at once", () => {
     // approval replaced the stored digest, so that acknowledgement is refused
     // and the boot never reaches CONSUMED.
     expect(harness.core.get(bootId)?.status).toBe("CONSUMED");
+  });
+
+  // The losing approval is the one that started first: it is parked inside the
+  // key unwrap while the second call runs the whole approval to completion.
+  it("gives the conflict to the approval that started first when it finishes last", async () => {
+    const keys = await bootKeys();
+    const { bootId } = await startBoot(harness, keys);
+
+    harness.gate.arm();
+    const first = approve(harness, bootId);
+    await harness.gate.reached;
+    const second = await approve(harness, bootId);
+    harness.gate.release();
+    const parked = await first;
+
+    expect(second.ok).toBe(true);
+    expect(parked.ok).toBe(false);
+    if (parked.ok) return;
+    expect(parked.reason).toBe("conflict");
+    expect(harness.core.get(bootId)?.status).toBe("DELIVERED");
   });
 
   it("writes at most one approval record for a boot", async () => {
@@ -336,7 +408,7 @@ describe("revocation as a reconnect kill switch", () => {
   // cancelForToken call that tokens.ts explicitly swallows on failure. Pass the
   // identity into the resume path, refuse a token id that is not the boot's,
   // and re-read revoked_at and expires_at before attaching.
-  it.fails("refuses to resume a boot whose token was revoked", async () => {
+  it("refuses to resume a boot whose token was revoked", async () => {
     const keys = await bootKeys();
     const { connection, bootId } = await startBoot(harness, keys);
     connection.close(1006, "network dropped");
@@ -356,7 +428,7 @@ describe("revocation as a reconnect kill switch", () => {
 
   // Same finding. A second, still valid token for the same environment gets the
   // same reconnect rights as the token that opened the boot.
-  it.fails("refuses a resume driven by a different token than the one that opened the boot", async () => {
+  it("refuses a resume driven by a different token than the one that opened the boot", async () => {
     const keys = await bootKeys();
     const { connection, bootId } = await startBoot(harness, keys);
     connection.close(1006, "network dropped");
@@ -415,7 +487,7 @@ describe("time limits the object has to enforce itself", () => {
   // TTL for APPROVED and DELIVERED boots but never checks pending_expires_at,
   // so a PENDING boot whose alarm did not fire is told it is still waiting.
   // Mirror the payload branch: expire it and send the terminal frame.
-  it.fails("expires a pending boot on resume when its TTL has already passed", async () => {
+  it("expires a pending boot on resume when its TTL has already passed", async () => {
     const keys = await bootKeys();
     const { connection, bootId } = await startBoot(harness, keys);
     connection.close(1006, "network dropped");
@@ -602,5 +674,59 @@ describe("an approval the approver did not read", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.reason).toBe("evidence_mismatch");
+  });
+});
+
+describe("boot request rate limiting per source address", () => {
+  let harness: Harness;
+
+  beforeEach(async () => {
+    harness = await createHarness();
+  });
+
+  // Finding 8 in docs/security-review-v1.md, spec section 37. Ten new boots per
+  // source address per 60 seconds; the eleventh is refused with 4429 without
+  // creating a row.
+  it("refuses the eleventh boot from one source address inside the window", async () => {
+    for (let index = 0; index < MAX_BOOTS_PER_SOURCE; index += 1) {
+      const keys = await bootKeys();
+      const started = await startBoot(harness, keys);
+      // Keep the pending count clear so this test measures the rate limit only.
+      await harness.core.cancelBoot({
+        bootId: started.bootId,
+        actorUserId: "user_1",
+        reason: "test",
+      });
+    }
+
+    const connection = harness.sockets.open();
+    await harness.core.handleFrame(connection, harness.identity, helloFrame(await bootKeys()));
+
+    const last = lastOf(connection);
+    expect(last.type).toBe("boot.error");
+    if (last.type !== "boot.error") return;
+    expect(last.code).toBe(4429);
+    expect(connection.closedCode).toBe(4429);
+    expect(connection.attachedBootId()).toBe(null);
+  });
+
+  it("counts each source address on its own and forgets the window", async () => {
+    for (let index = 0; index < MAX_BOOTS_PER_SOURCE; index += 1) {
+      const started = await startBoot(harness, await bootKeys());
+      await harness.core.cancelBoot({
+        bootId: started.bootId,
+        actorUserId: "user_1",
+        reason: "test",
+      });
+    }
+
+    // A different address is unaffected.
+    const other = await startBoot(harness, await bootKeys(), harness.secondIdentity);
+    expect(harness.core.get(other.bootId)?.status).toBe("PENDING");
+
+    // And the first address is allowed again once the window has passed.
+    harness.clock.now = START + (BOOT_RATE_WINDOW_SECONDS + 1) * 1000;
+    const later = await startBoot(harness, await bootKeys());
+    expect(harness.core.get(later.bootId)?.status).toBe("PENDING");
   });
 });

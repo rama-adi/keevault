@@ -5,6 +5,7 @@ import { env } from "cloudflare:workers";
 import { z } from "zod";
 
 import { log } from "../log.ts";
+import { setupTokenAccepted } from "./setup-token.ts";
 
 /**
  * First-owner setup ceremony (spec section 21).
@@ -34,23 +35,6 @@ const claimOwnerBody = z.object({
   email: z.email().max(254),
 });
 
-/**
- * Compare two secrets without leaking their contents through timing. Length is
- * not secret here, but the comparison stays constant time across the shorter
- * of the two buffers and folds the length difference into the result.
- */
-function constantTimeEquals(left: string, right: string): boolean {
-  const encoder = new TextEncoder();
-  const leftBytes = encoder.encode(left);
-  const rightBytes = encoder.encode(right);
-  let difference = leftBytes.length ^ rightBytes.length;
-  const length = Math.max(leftBytes.length, rightBytes.length);
-  for (let index = 0; index < length; index += 1) {
-    difference |= (leftBytes[index] ?? 0) ^ (rightBytes[index] ?? 0);
-  }
-  return difference === 0;
-}
-
 export function vaultSetup(): BetterAuthPlugin {
   return {
     id: "vault-setup",
@@ -65,8 +49,9 @@ export function vaultSetup(): BetterAuthPlugin {
             throw new APIError("NOT_FOUND");
           }
 
-          const expected = env.VAULT_SETUP_TOKEN;
-          if (expected.length === 0 || !constantTimeEquals(ctx.body.setupToken, expected)) {
+          // An unconfigured secret answers exactly like a wrong token, so the
+          // 404 below never tells a prober how far setup has got.
+          if (!setupTokenAccepted(env.VAULT_SETUP_TOKEN, ctx.body.setupToken)) {
             log({
               level: "warn",
               event: "auth.setup.rejected",

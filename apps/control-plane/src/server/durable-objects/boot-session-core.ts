@@ -66,6 +66,15 @@ import type { BootSqlStorage } from "./boot-storage.ts";
 /** The largest text frame the server accepts, from the protocol document. */
 export const MAX_FRAME_BYTES = 1024 * 1024;
 
+/** Boot requests one source address may create per window (spec section 37). */
+export const MAX_BOOTS_PER_SOURCE = 10;
+
+/** The window the source-address limit is measured over, in seconds. */
+export const BOOT_RATE_WINDOW_SECONDS = 60;
+
+/** The reason recorded when a resume finds the boot's token revoked or expired. */
+const TOKEN_REVOKED_REASON = "bootstrap token revoked";
+
 /** One socket the core can write to. */
 export interface BootSocket {
   send(text: string): void;
@@ -255,6 +264,7 @@ const SCHEMA_STATEMENTS: readonly string[] = [
    )`,
   `CREATE INDEX IF NOT EXISTS boots_by_status ON boots (status, created_at)`,
   `CREATE INDEX IF NOT EXISTS boots_by_token ON boots (token_id, status)`,
+  `CREATE INDEX IF NOT EXISTS boots_by_source ON boots (source_ip, created_at)`,
   `CREATE TABLE IF NOT EXISTS challenges (
      boot_id TEXT NOT NULL,
      challenge TEXT NOT NULL,
@@ -321,6 +331,21 @@ export class BootSessionCore {
     const rows = this.#deps.storage.exec(
       "SELECT COUNT(*) AS total FROM boots WHERE token_id = ? AND status = 'PENDING'",
       tokenId,
+    );
+    const first = rows[0];
+    return first === undefined ? 0 : countRowSchema.parse(first).total;
+  }
+
+  /**
+   * Boots this source address created inside the rate window (spec section 37).
+   * Derived from `boots.created_at`, so it counts every request the address
+   * made, not only the ones that are still pending.
+   */
+  #countRecentFromSource(sourceIp: string): number {
+    const rows = this.#deps.storage.exec(
+      "SELECT COUNT(*) AS total FROM boots WHERE source_ip = ? AND created_at > ?",
+      sourceIp,
+      this.#deps.now() - BOOT_RATE_WINDOW_SECONDS * 1000,
     );
     const first = rows[0];
     return first === undefined ? 0 : countRowSchema.parse(first).total;
@@ -409,10 +434,15 @@ export class BootSessionCore {
         await this.#handleHello(connection, identity, message);
         return;
       case "boot.resume":
-        this.#handleResume(connection, message.bootId);
+        await this.#handleResume(connection, identity, message.bootId);
         return;
       case "boot.challenge-response":
-        await this.#handleChallengeResponse(connection, message.bootId, message.signature);
+        await this.#handleChallengeResponse(
+          connection,
+          identity,
+          message.bootId,
+          message.signature,
+        );
         return;
       case "boot.received":
         await this.#handleReceived(connection, message.bootId, message.payloadDigest);
@@ -435,6 +465,22 @@ export class BootSessionCore {
         connection,
         CLOSE_CODES.PROTOCOL_ERROR,
         "This connection already belongs to a boot.",
+      );
+      return;
+    }
+
+    // A boot whose pending TTL has passed is EXPIRED whether or not the alarm
+    // ran, so it must not hold a slot in the count below (spec section 18).
+    await this.#expireDue();
+
+    if (
+      identity.sourceIp.length > 0 &&
+      this.#countRecentFromSource(identity.sourceIp) >= MAX_BOOTS_PER_SOURCE
+    ) {
+      sendError(
+        connection,
+        CLOSE_CODES.RATE_LIMITED,
+        "This source address has created too many boot requests. Try again shortly.",
       );
       return;
     }
@@ -527,14 +573,23 @@ export class BootSessionCore {
     this.#recomputeAlarm();
   }
 
-  #handleResume(connection: BootConnection, bootId: string): void {
+  async #handleResume(
+    connection: BootConnection,
+    identity: BootIdentity,
+    bootId: string,
+  ): Promise<void> {
     const boot = this.#readBoot(bootId);
     if (boot === null) {
       sendError(connection, CLOSE_CODES.UNKNOWN_BOOT, "This environment has no such boot.");
       return;
     }
-    if (isTerminal(boot.status)) {
-      this.#sendTerminal(boot, [connection]);
+    if (identity.tokenId !== boot.token_id) {
+      sendError(connection, CLOSE_CODES.FORBIDDEN, "This bootstrap token did not open that boot.");
+      return;
+    }
+    const current = await this.#expireIfDue(boot);
+    if (isTerminal(current.status)) {
+      this.#sendTerminalOnce(current, connection);
       return;
     }
     const challenge = this.#deps.randomChallenge();
@@ -551,6 +606,7 @@ export class BootSessionCore {
 
   async #handleChallengeResponse(
     connection: BootConnection,
+    identity: BootIdentity,
     bootId: string,
     signature: string,
   ): Promise<void> {
@@ -587,36 +643,63 @@ export class BootSessionCore {
       return;
     }
 
-    connection.attach(bootId, this.#deps.now());
-    await this.#audit("boot.reconnected", boot, "boot", bootId, new Map());
+    // Spec sections 17 and 38: the token that opened the boot must still be the
+    // one on the wire, and it must still be valid. This is the administrator's
+    // kill switch, and it has to hold here rather than only in the best-effort
+    // cancel that runs at revocation time.
+    if (identity.tokenId !== boot.token_id) {
+      sendError(connection, CLOSE_CODES.FORBIDDEN, "This bootstrap token did not open that boot.");
+      return;
+    }
+    if (!(await this.#tokenStillValid(boot.token_id))) {
+      await this.#cancelOne(boot, TOKEN_REVOKED_REASON, null);
+      this.#recomputeAlarm();
+      sendError(
+        connection,
+        CLOSE_CODES.FORBIDDEN,
+        "The bootstrap token for that boot is no longer valid.",
+      );
+      return;
+    }
 
-    if (boot.status === "PENDING") {
+    const current = await this.#expireIfDue(boot);
+    if (isTerminal(current.status)) {
+      this.#sendTerminalOnce(current, connection);
+      return;
+    }
+
+    connection.attach(bootId, this.#deps.now());
+    await this.#audit("boot.reconnected", current, "boot", bootId, new Map());
+
+    if (current.status === "PENDING") {
       connection.send(
         frameText({
           type: "boot.resumed",
           bootId,
           status: "PENDING",
-          expiresAt: isoOrNull(boot.pending_expires_at) ?? iso(this.#deps.now()),
+          expiresAt: isoOrNull(current.pending_expires_at) ?? iso(this.#deps.now()),
         }),
       );
       return;
     }
 
-    const payloadExpiresAt = boot.payload_expires_at;
-    if (payloadExpiresAt !== null && payloadExpiresAt <= this.#deps.now()) {
-      await this.#expire(boot, "expirePayload");
-      return;
-    }
-    const status = boot.status === "APPROVED" ? "APPROVED" : "DELIVERED";
+    const status = current.status === "APPROVED" ? "APPROVED" : "DELIVERED";
     connection.send(
       frameText({
         type: "boot.resumed",
         bootId,
         status,
-        expiresAt: isoOrNull(payloadExpiresAt) ?? iso(this.#deps.now()),
+        expiresAt: isoOrNull(current.payload_expires_at) ?? iso(this.#deps.now()),
       }),
     );
-    await this.#deliver(boot, [connection]);
+    await this.#deliver(current, [connection]);
+  }
+
+  /** True when the boot's bootstrap token exists, is unrevoked and unexpired. */
+  async #tokenStillValid(tokenId: string): Promise<boolean> {
+    const token = await getBootstrapTokenByTokenId(this.#deps.db, tokenId.replace(/^tok_/, ""));
+    if (token === null || token.revokedAt !== null) return false;
+    return token.expiresAt === null || Date.parse(token.expiresAt) > this.#deps.now();
   }
 
   async #handleReceived(
@@ -733,8 +816,23 @@ export class BootSessionCore {
     if (expired !== null) this.#sendTerminal(expired, this.#deps.sockets.forBoot(boot.id));
   }
 
-  /** Called by the Durable Object alarm. Expires whatever is due, then rearms. */
-  async onAlarm(): Promise<void> {
+  /**
+   * Expire one boot whose TTL has passed and hand back the current row. The
+   * alarm is the normal way a boot expires, but a hibernated object handles an
+   * incoming frame before the alarm runs, so every read path checks too.
+   */
+  async #expireIfDue(boot: BootRow): Promise<BootRow> {
+    if (isTerminal(boot.status)) return boot;
+    const now = this.#deps.now();
+    const deadline = boot.status === "PENDING" ? boot.pending_expires_at : boot.payload_expires_at;
+    if (deadline === null || deadline > now) return boot;
+    await this.#expire(boot, boot.status === "PENDING" ? "expirePending" : "expirePayload");
+    this.#recomputeAlarm();
+    return this.#readBoot(boot.id) ?? boot;
+  }
+
+  /** Expire every live boot whose deadline has passed. */
+  async #expireDue(): Promise<void> {
     const now = this.#deps.now();
     for (const boot of this.#readLive()) {
       if (boot.status === "PENDING") {
@@ -747,6 +845,20 @@ export class BootSessionCore {
         await this.#expire(boot, "expirePayload");
       }
     }
+  }
+
+  /**
+   * Send the terminal frame to one socket, unless `#expire` or `#cancelOne`
+   * already reached it through the registry because it was attached.
+   */
+  #sendTerminalOnce(boot: BootRow, connection: BootConnection): void {
+    if (connection.attachedBootId() === boot.id) return;
+    this.#sendTerminal(boot, [connection]);
+  }
+
+  /** Called by the Durable Object alarm. Expires whatever is due, then rearms. */
+  async onAlarm(): Promise<void> {
+    await this.#expireDue();
     this.#recomputeAlarm();
   }
 
@@ -855,7 +967,16 @@ export class BootSessionCore {
     const payload = frameText(approved);
     const payloadDigest = await sha256HexOfText(payload);
 
-    const next = this.#apply(boot, "approve");
+    // Critical section. Everything above awaited, so another approve for the
+    // same boot may have run to completion in between: re-read the row and
+    // write the transition and the payload with no await in between, which
+    // JavaScript's single thread makes indivisible. The loser discards the
+    // envelope it built and reports a conflict.
+    const current = this.#readBoot(boot.id);
+    if (current === null || current.status !== "PENDING") {
+      return failure("conflict", "That boot changed state while it was being approved.");
+    }
+    const next = this.#apply(current, "approve");
     if (next === null) {
       return failure("conflict", "That boot changed state while it was being approved.");
     }

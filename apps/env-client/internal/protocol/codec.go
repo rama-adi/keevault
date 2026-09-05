@@ -206,6 +206,9 @@ func validateApproved(m Approved) error {
 	if err := checkLen("keyEnvelope.ciphertext", m.KeyEnvelope.Ciphertext, 48); err != nil {
 		return err
 	}
+	if len(m.Secrets) > MaxSecretsPerPayload {
+		return fmt.Errorf("payload carries %d secrets, over the limit of %d", len(m.Secrets), MaxSecretsPerPayload)
+	}
 	for i, s := range m.Secrets {
 		if s.ID == "" || s.Name == "" {
 			return fmt.Errorf("secrets[%d] is missing id or name", i)

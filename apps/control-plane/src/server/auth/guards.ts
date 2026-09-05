@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ROLE_RANK, ROLES, STEP_UP_MAX_AGE_SECONDS, type Role } from "../../lib/roles.ts";
 import { log } from "../log.ts";
 import { createAuth } from "./auth.ts";
+import { isRecentStepUp } from "./step-up-policy.ts";
 
 /** Error codes the UI maps to a specific recovery. */
 export const AUTH_ERROR_CODES = ["unauthenticated", "forbidden", "step_up_required"] as const;
@@ -31,11 +32,20 @@ export function isAuthorizationError(error: Error): error is AuthorizationError 
 
 const roleSchema = z.enum(ROLES).catch("viewer");
 
-const dateFromSession = z.union([
-  z.date(),
-  z.string().transform((value) => new Date(value)),
-  z.number().transform((value) => new Date(value)),
-]);
+/**
+ * The session's `stepUpAt` as Better Auth hands it back. A value the `Date`
+ * constructor cannot read is a parse failure rather than an Invalid Date, so it
+ * shows up as `auth.session.unparseable` instead of reaching a guard.
+ */
+const dateFromSession = z
+  .union([
+    z.date(),
+    z.string().transform((value) => new Date(value)),
+    z.number().transform((value) => new Date(value)),
+  ])
+  .refine((value) => Number.isFinite(value.getTime()), {
+    message: "timestamp is unreadable",
+  });
 
 const sessionSchema = z.object({
   user: z.object({
@@ -124,6 +134,16 @@ export async function requireRole(minimum: Role): Promise<VaultSession> {
 }
 
 /**
+ * The step-up timestamp as an RFC 3339 string, or null when there is none and
+ * when the stored value cannot be read as a time.
+ */
+function stepUpStamp(verifiedAt: Date | null): string | null {
+  if (verifiedAt === null) return null;
+  const millis = verifiedAt.getTime();
+  return Number.isFinite(millis) ? new Date(millis).toISOString() : null;
+}
+
+/**
  * Require a passkey verification newer than `maxAgeSeconds` (spec section 22).
  *
  * The passkey plugin in 1.7.2 exposes no re-verify endpoint: its only assertion
@@ -137,10 +157,7 @@ export async function requireRecentPasskey(
   maxAgeSeconds: number = STEP_UP_MAX_AGE_SECONDS,
 ): Promise<VaultSession> {
   const session = await requireSession();
-  const verifiedAt = session.stepUpAt;
-  const ageSeconds =
-    verifiedAt === null ? Number.POSITIVE_INFINITY : (Date.now() - verifiedAt.getTime()) / 1000;
-  if (ageSeconds > maxAgeSeconds) {
+  if (!isRecentStepUp(stepUpStamp(session.stepUpAt), new Date(), maxAgeSeconds)) {
     log({
       level: "info",
       event: "auth.step_up.required",

@@ -7,6 +7,11 @@ import "encoding/json"
 // Version is the protocol version sent in boot.hello and boot.resume.
 const Version = 1
 
+// MaxSecretsPerPayload is the largest number of secret records a boot.approved
+// may carry. The server never sends more, so a longer list is a protocol error
+// rather than something to decrypt.
+const MaxSecretsPerPayload = 4096
+
 // Message types.
 const (
 	TypeHello             = "boot.hello"

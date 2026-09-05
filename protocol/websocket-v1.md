@@ -327,6 +327,8 @@ Redelivery inside the payload TTL uses the same stored frame, so the digest does
 | 4410 | the boot is terminal                                                                           | `boot.declined`, `boot.expired` or `boot.canceled` |
 | 4429 | rate limited                                                                                   | `boot.error`                                       |
 
+A source address may create at most 10 boot requests per environment in any 60 second window; the next `boot.hello` from that address gets `boot.error` with 4429 and a close with the same code.
+
 Both sides treat any other close code as a transport failure and reconnect under the backoff policy.
 
 ## Error handling

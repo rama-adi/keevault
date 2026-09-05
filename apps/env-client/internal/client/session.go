@@ -19,9 +19,16 @@ import (
 	"github.com/ramaadi/env-vault/apps/env-client/internal/vaultcrypto"
 )
 
-// readLimit caps one frame. An environment of 256 secrets at the 64 KiB value
-// limit still fits.
-const readLimit = 32 << 20
+// maxFrameBytes is the protocol's frame limit, which the server enforces on
+// the way in. The client agrees with it rather than with the plaintext
+// arithmetic of 256 secrets at 64 KiB each: what travels is ciphertext, and a
+// larger frame is something the server would never have sent.
+const maxFrameBytes = 1 << 20
+
+// readLimit leaves 64 KiB of slack above the protocol limit so a frame that is
+// only slightly too large is read and reported as a protocol error rather than
+// as a torn connection. Anything past that is cut off by the transport.
+const readLimit = maxFrameBytes + 64<<10
 
 const (
 	writeTimeout = 15 * time.Second
@@ -328,6 +335,9 @@ func (s *Session) read(ctx context.Context, conn *websocket.Conn) ([]byte, proto
 	if kind != websocket.MessageText {
 		return nil, nil, exitf(ExitProtocol, "vault sent a binary frame")
 	}
+	if len(frame) > maxFrameBytes {
+		return nil, nil, exitf(ExitProtocol, "vault sent a frame of %d bytes, over the %d byte protocol limit", len(frame), maxFrameBytes)
+	}
 	msg, err := protocol.Decode(frame)
 	if err != nil {
 		return nil, nil, exitf(ExitProtocol, "%v", err)
@@ -341,6 +351,9 @@ func (s *Session) classifyRead(err error) error {
 	var exit *ExitError
 	if errors.As(err, &exit) {
 		return err
+	}
+	if errors.Is(err, websocket.ErrMessageTooBig) {
+		return exitf(ExitProtocol, "vault sent a frame over the %d byte protocol limit", maxFrameBytes)
 	}
 	status := websocket.CloseStatus(err)
 	switch status {
