@@ -1,0 +1,47 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "env-vault",
+  "compatibility_date": "2026-09-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/server/worker.ts",
+  "observability": {
+    "enabled": true,
+  },
+  // Required secrets. Set with `wrangler secret put <NAME>` for remote and in
+  // .dev.vars for local development. See .dev.vars.example.
+  //   VAULT_MASTER_KEY_V1   32 random bytes, base64url, wraps project keys
+  //   BETTER_AUTH_SECRET    Better Auth signing secret
+  //   VAULT_SETUP_TOKEN     one-time token gating the /setup ceremony
+  "vars": {
+    "VAULT_MASTER_KEY_ACTIVE_VERSION": "1",
+    "BETTER_AUTH_URL": "http://localhost:5173",
+  },
+  "d1_databases": [
+    {
+      "binding": "VAULT_DB",
+      "database_name": "env-vault-vault",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../migrations/vault",
+    },
+    {
+      "binding": "AUTH_DB",
+      "database_name": "env-vault-auth",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "../../migrations/auth",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ENVIRONMENT_SESSION",
+        "class_name": "EnvironmentSessionDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["EnvironmentSessionDO"],
+    },
+  ],
+}

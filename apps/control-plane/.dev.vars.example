@@ -1,0 +1,14 @@
+# Copy to .dev.vars for local development. Never commit .dev.vars.
+# Each value must be an independent random value. Do not derive one from another.
+
+# 32 random bytes, base64url without padding (43 characters).
+# Generate: node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+VAULT_MASTER_KEY_V1=""
+
+# Better Auth signing secret, at least 32 characters.
+# Generate: openssl rand -base64 32
+BETTER_AUTH_SECRET=""
+
+# One-time token that gates the first-owner setup ceremony at /setup.
+# Generate: openssl rand -base64 32
+VAULT_SETUP_TOKEN=""
