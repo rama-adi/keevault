@@ -8,6 +8,9 @@ catalogMode: prefer
 catalog:
   "@oxlint/plugins": 1.79.0
   "@types/node": ^24
+  cn: ^0.2.4
+  radix-ui: ^1.6.7
+  shadcn: ^4.20.1
   typescript: ^7.0.2
   vite: npm:@voidzero-dev/vite-plus-core@0.3.0
   vite-plus: 0.3.0
@@ -18,3 +21,9 @@ peerDependencyRules:
     - vite
   allowedVersions:
     vite: "*"
+minimumReleaseAgeExclude:
+  - "@cloudflare/workers-types@5.20260905.1"
+  - lucide-react@1.41.0
+allowBuilds:
+  esbuild: true
+  workerd: true
