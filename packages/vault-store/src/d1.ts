@@ -1,4 +1,3 @@
-import type { D1Database } from "@cloudflare/workers-types";
 import type { DatabaseSync } from "node:sqlite";
 
 /** Value types the vault binds into SQL. Every binary field is stored as b64u text. */
@@ -28,10 +27,23 @@ export interface VaultDatabase {
 }
 
 /**
+ * The part of a Cloudflare D1 binding `fromD1` narrows.
+ *
+ * The shape is written out here instead of imported from
+ * `@cloudflare/workers-types`, whose published entry declares its types as
+ * globals and exports nothing, so a bundled declaration file cannot resolve an
+ * import from it.
+ */
+export interface D1BindingLike {
+  prepare(sql: string): VaultPreparedStatement;
+  batch<Row>(statements: VaultPreparedStatement[]): Promise<VaultQueryResult<Row>[]>;
+}
+
+/**
  * Adapt a Cloudflare D1 binding. D1 already has the shape the store needs, so this
  * is a typed narrowing rather than a wrapper.
  */
-export function fromD1(db: D1Database): VaultDatabase {
+export function fromD1(db: D1BindingLike): VaultDatabase {
   return db;
 }
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { integerColumn, keyStatusColumn, nullableTextColumn, timestampColumn } from "../columns.ts";
-import type { VaultDatabase } from "../d1.ts";
+import type { VaultDatabase, VaultPreparedStatement } from "../d1.ts";
 import { execute, selectMany, selectOne, selectRequired } from "../sql.ts";
 
 export const projectKeyRowSchema = z.object({
@@ -100,16 +100,21 @@ export interface RetireProjectKeyInput {
   now: string;
 }
 
+export function buildRetireProjectKeyStatement(
+  db: VaultDatabase,
+  input: RetireProjectKeyInput,
+): VaultPreparedStatement {
+  return db
+    .prepare(
+      `UPDATE project_keys SET status = 'retired', retired_at = ?
+       WHERE project_id = ? AND version = ?`,
+    )
+    .bind(input.now, input.projectId, input.version);
+}
+
 export async function retireProjectKey(
   db: VaultDatabase,
   input: RetireProjectKeyInput,
 ): Promise<void> {
-  await execute(
-    db
-      .prepare(
-        `UPDATE project_keys SET status = 'retired', retired_at = ?
-         WHERE project_id = ? AND version = ?`,
-      )
-      .bind(input.now, input.projectId, input.version),
-  );
+  await execute(buildRetireProjectKeyStatement(db, input));
 }

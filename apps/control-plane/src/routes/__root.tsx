@@ -56,6 +56,20 @@ function AppNav() {
         <Button asChild variant="ghost" size="sm">
           <Link to="/projects">Projects</Link>
         </Button>
+        {/*
+          A plain anchor because the /boots routes belong to the bootstrap work
+          package and are not in the generated route tree yet. Turn it into a
+          `Link` once they land, so this navigates client side.
+        */}
+        <Button asChild variant="ghost" size="sm">
+          <a href="/boots">Boots</a>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link to="/audit">Audit</Link>
+        </Button>
+        <Button asChild variant="ghost" size="sm">
+          <Link to="/settings">Settings</Link>
+        </Button>
       </nav>
     </header>
   );

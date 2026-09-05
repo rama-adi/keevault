@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { integerColumn, timestampColumn } from "../columns.ts";
-import type { VaultDatabase } from "../d1.ts";
+import type { VaultDatabase, VaultPreparedStatement } from "../d1.ts";
 import { execute, selectMany, selectOne, selectRequired } from "../sql.ts";
 
 export const projectRowSchema = z.object({
@@ -78,13 +78,18 @@ export interface SetCurrentProjectKeyVersionInput {
   now: string;
 }
 
+export function buildSetCurrentProjectKeyVersionStatement(
+  db: VaultDatabase,
+  input: SetCurrentProjectKeyVersionInput,
+): VaultPreparedStatement {
+  return db
+    .prepare("UPDATE projects SET current_project_key_version = ?, updated_at = ? WHERE id = ?")
+    .bind(input.version, input.now, input.projectId);
+}
+
 export async function setCurrentProjectKeyVersion(
   db: VaultDatabase,
   input: SetCurrentProjectKeyVersionInput,
 ): Promise<void> {
-  await execute(
-    db
-      .prepare("UPDATE projects SET current_project_key_version = ?, updated_at = ? WHERE id = ?")
-      .bind(input.version, input.now, input.projectId),
-  );
+  await execute(buildSetCurrentProjectKeyVersionStatement(db, input));
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { integerColumn, timestampColumn } from "../columns.ts";
-import type { VaultDatabase } from "../d1.ts";
+import type { VaultDatabase, VaultPreparedStatement } from "../d1.ts";
 import { execute, selectMany, selectOne, selectRequired } from "../sql.ts";
 
 /** Secret metadata for the dashboard. Never carries ciphertext. */
@@ -129,4 +129,31 @@ export async function deleteSecret(db: VaultDatabase, input: GetSecretInput): Pr
       .prepare("DELETE FROM secrets WHERE environment_id = ? AND name = ?")
       .bind(input.environmentId, input.name),
   );
+}
+
+export interface ReencryptSecretInput {
+  id: string;
+  ciphertext: string;
+  nonce: string;
+  envKeyVersion: number;
+  now: string;
+}
+
+/**
+ * Replace the sealed bytes of one secret after an environment-key rotation.
+ *
+ * `secret_version` does not change: the value is the same, only the key that
+ * protects it is new. Returned as a statement so the whole rotation, including
+ * the key switch, goes into one batch.
+ */
+export function buildReencryptSecretStatement(
+  db: VaultDatabase,
+  input: ReencryptSecretInput,
+): VaultPreparedStatement {
+  return db
+    .prepare(
+      `UPDATE secrets SET ciphertext = ?, nonce = ?, env_key_version = ?, updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(input.ciphertext, input.nonce, input.envKeyVersion, input.now, input.id);
 }
