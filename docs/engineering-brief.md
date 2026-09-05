@@ -1,5 +1,35 @@
 # env-vault V1 engineering brief (read fully before touching code)
 
+## Status
+
+This section reflects what the code and tests in this repository actually do, checked against the phase list in section 43 below. It does not run the Zeabur live test matrix in `docs/zeabur.md` or any browser-driven passkey UI test; both are checked by an operator against a real deployment, not by an automated suite, and every row in `docs/zeabur.md` still reads "not yet run".
+
+Implemented and covered by tests:
+
+- Phase 0, protocol and threat-model freeze: `docs/threat-model.md` and `protocol/websocket-v1.md` exist and match the message catalogue in `packages/protocol`.
+- Phase 1, cryptographic core: AES-GCM wrapping, X25519 agreement, HKDF, Ed25519 resume signatures, and the signed-build-manifest canonicalization are implemented in both `packages/crypto` and `apps/env-client/internal/vaultcrypto`, cross-checked against the shared vectors in `crypto/test-vectors`.
+- Phase 2, D1 vault: every table in spec section 19 exists in `migrations/vault/0001_init.sql`, with a typed repository layer in `packages/vault-store` and a test that inspects raw D1 contents for plaintext.
+- Phase 3, bootstrap authentication: token generation, hashing, CIDR checks, revocation, and expiry are implemented and tested in `bootstrap-auth.test.ts` and `keys.test.ts`.
+- Phase 4, Environment Durable Object: the boot state machine in `boot-session-core.ts` implements every state and transition in section 15, tested including hibernation and restart.
+- Phase 5, Go bootstrapper: `apps/env-client` implements the full client flow, including reconnect and resume proof, tested against a fake vault server in `fakevault_test.go`.
+- Phase 6, Better Auth dashboard auth: passkey-only login, the first-owner setup ceremony, and step-up authentication are implemented. Inviting a further administrator after setup is not implemented; `inviteAdmin` in `src/server/auth/setup.ts` is a stub that throws. Operators are added only by repeating the setup ceremony's account-creation path and are then promoted or demoted on `/settings`.
+- Phase 7, core dashboard: every page in section 43 exists (`/projects`, `/projects/$projectId`, the environment page's Secrets, Tokens, and Policy tabs, `/boots`, `/audit`, `/settings`). Secret reveal is correctly not implemented, matching the spec.
+- Phase 8, approval workflow: the Durable Object re-validates pending state, expiry, token validity, and policy before approving, so a stale dashboard read cannot authorize delivery.
+- Phase 9, provenance framework: the claims-only and signed-build-manifest-v1 verifiers are implemented, with trusted-signer management on the dashboard.
+
+Implemented but not exercised against a live external system:
+
+- Phase 10, Zeabur integration: `examples/zeabur-node-app` and its Dockerfile exist and build `vault-bootstrap` as the container entrypoint. The integration test matrix in `docs/zeabur.md` (native Git build, prebuilt OCI, readiness timing, reconnect under a real Zeabur deployment) has not been run against Zeabur; every row is unrun.
+
+Partially covered:
+
+- Phase 11, security testing: cryptographic tamper tests, authorization tests, and state-machine concurrency tests exist across `packages/crypto`, `packages/vault-store`, and `boot-session-core.test.ts`. No dedicated CSRF or session-fixation test suite was found, and no browser-driven WebAuthn or passkey UI test exists; step-up and passkey logic is covered only at the server-function level (`guards.ts`, `step-up.ts`), not through an automated browser flow. Treat both as not implemented for the purpose of the production launch criteria in section 47.
+
+Not implemented in V1, called out where the spec would otherwise imply they exist:
+
+- Inviting a new administrator without repeating the full setup flow (section 21).
+- Any automated Zeabur or WebAuthn UI test run (section 43 phases 10 and 11, and the checklist in section 47).
+
 Repo: /Users/ramaadi/WorkProjects/env-vault (pnpm workspace managed by Vite+ `vp`).
 Product spec: docs/product-specs.md is authoritative for behaviour. This brief pins the exact encodings, layout and message shapes the spec leaves open, so the TypeScript and Go implementations agree byte for byte. Agents read this file before starting a work package.
 Repo conventions: CLAUDE.md (Vite+ usage, TanStack Start page/route rules, shadcn rules).
