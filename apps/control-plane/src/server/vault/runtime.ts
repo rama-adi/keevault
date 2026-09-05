@@ -10,9 +10,23 @@ import { fromD1 } from "@env-vault/vault-store";
 import { env } from "cloudflare:workers";
 
 import type { VaultSession } from "../auth/guards.ts";
-import type { VaultContext } from "./context.ts";
+import type { BootSessionControl, VaultContext } from "./context.ts";
 import { systemClock } from "./context.ts";
 import { loadMasterKeys } from "./keys.ts";
+
+/** Boot cancellation over the environment Durable Object binding. */
+export const workerBootSessionControl: BootSessionControl = {
+  async cancelForToken(environmentId: string, tokenRowId: string, reason: string): Promise<number> {
+    return await stubFor(environmentId).cancelForToken(tokenRowId, reason);
+  },
+  async cancelEnvironment(environmentId: string, reason: string): Promise<number> {
+    return await stubFor(environmentId).cancel(reason);
+  },
+};
+
+function stubFor(environmentId: string) {
+  return env.ENVIRONMENT_SESSION.get(env.ENVIRONMENT_SESSION.idFromName(environmentId));
+}
 
 /** A context acting as the signed-in operator. */
 export function vaultContextForSession(session: VaultSession): VaultContext {
@@ -21,6 +35,7 @@ export function vaultContextForSession(session: VaultSession): VaultContext {
     keyring: loadMasterKeys(env),
     actor: { type: "user", id: session.userId },
     now: systemClock,
+    boots: workerBootSessionControl,
   };
 }
 

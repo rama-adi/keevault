@@ -32,6 +32,7 @@ export const AUDIT_ACTIONS = [
   "boot.expired",
   "boot.delivered",
   "boot.consumed",
+  "boot.canceled",
   "project-key.rotated",
   "environment-key.rotated",
   "master-key-rewrapped",

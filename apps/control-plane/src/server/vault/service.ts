@@ -7,7 +7,7 @@
  * operator.
  */
 
-export { systemClock, type VaultContext } from "./context.ts";
+export { systemClock, type BootSessionControl, type VaultContext } from "./context.ts";
 export {
   auditMetadataJson,
   AUDIT_ACTIONS,
@@ -40,6 +40,8 @@ export {
   setEnvironmentPolicy,
   DEFAULT_APPROVED_TTL_SECONDS,
   DEFAULT_PENDING_TTL_SECONDS,
+  ENVIRONMENT_DELETED_REASON,
+  PROJECT_DELETED_REASON,
 } from "./projects.ts";
 export { rotateEnvironmentKey, rotateProjectKey } from "./rotation.ts";
 export {
@@ -62,6 +64,7 @@ export {
   revokeBootstrapToken,
   updateTokenCidrs,
   DEFAULT_MAX_PENDING_BOOTS,
+  TOKEN_REVOKED_REASON,
   type CreatedBootstrapToken,
 } from "./tokens.ts";
 export {

@@ -12,3 +12,8 @@ BETTER_AUTH_SECRET=""
 # One-time token that gates the first-owner setup ceremony at /setup.
 # Generate: openssl rand -base64 32
 VAULT_SETUP_TOKEN=""
+
+# Shared secret for the end-to-end harness routes. Only read by the harness
+# entry, which is built only when VAULT_E2E=1. At least 16 characters.
+# Generate: openssl rand -base64 32
+VAULT_E2E_SECRET=""

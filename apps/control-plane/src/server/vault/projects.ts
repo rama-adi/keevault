@@ -28,6 +28,7 @@ import {
   type ProjectRow,
 } from "@env-vault/vault-store";
 
+import { log } from "../log.ts";
 import { writeAuditEvent, type AuditMetadataValue } from "./audit.ts";
 import type { VaultContext } from "./context.ts";
 import { generatePrefixedUlidId } from "./ids.ts";
@@ -39,6 +40,40 @@ import {
   type ProjectSummary,
 } from "./types.ts";
 import { VaultInputError } from "./validation.ts";
+
+/** The reason recorded on every boot canceled because its environment went away. */
+export const ENVIRONMENT_DELETED_REASON = "environment deleted";
+
+/** The reason recorded on every boot canceled because its project went away. */
+export const PROJECT_DELETED_REASON = "project deleted";
+
+/**
+ * Cancel every live boot in one environment before its key material goes away
+ * (spec section 40).
+ *
+ * A failure to reach the Durable Object is logged and does not stop the
+ * deletion. The operator asked for the keys to be removed, and a boot that
+ * survives the call has nothing left to decrypt.
+ */
+async function cancelLiveBoots(
+  context: VaultContext,
+  projectId: string,
+  environmentId: string,
+  reason: string,
+): Promise<void> {
+  try {
+    await context.boots.cancelEnvironment(environmentId, reason);
+  } catch {
+    log({
+      level: "warn",
+      event: "environment.delete.cancel-failed",
+      outcome: "error",
+      reason: "boot_cancel_failed",
+      projectId,
+      environmentId,
+    });
+  }
+}
 
 /** Default boot TTLs for a new environment (engineering brief). */
 export const DEFAULT_PENDING_TTL_SECONDS = 1800;
@@ -133,6 +168,9 @@ export async function deleteProject(context: VaultContext, projectId: string): P
       ]),
     },
   );
+  for (const environment of environments) {
+    await cancelLiveBoots(context, projectId, environment.id, PROJECT_DELETED_REASON);
+  }
   await deleteProjectRow(context.db, projectId);
 }
 
@@ -250,6 +288,7 @@ export async function deleteEnvironment(
       ]),
     },
   );
+  await cancelLiveBoots(context, environment.projectId, environmentId, ENVIRONMENT_DELETED_REASON);
   await deleteEnvironmentRow(context.db, environmentId);
 }
 

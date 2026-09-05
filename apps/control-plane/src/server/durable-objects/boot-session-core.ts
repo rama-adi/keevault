@@ -59,6 +59,7 @@ import {
   type ProvenanceVerifier,
   type VerificationResult,
 } from "../provenance/index.ts";
+import type { AuditAction } from "../vault/audit.ts";
 import type { UnwrappedEnvironmentDek } from "../vault/keys.ts";
 import type { BootSqlStorage } from "./boot-storage.ts";
 
@@ -351,7 +352,7 @@ export class BootSessionCore {
   // ------------------------------------------------------------------ audit
 
   async #audit(
-    action: string,
+    action: AuditAction,
     boot: BootRow,
     actorType: "user" | "system" | "boot",
     actorId: string | null,

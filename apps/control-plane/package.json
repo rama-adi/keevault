@@ -4,14 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp dev",
     "build": "vp build",
-    "preview": "vp preview",
+    "build:check-no-harness": "vp build && node scripts/assert-no-harness.mjs",
     "check": "vp check",
-    "test": "vp test",
-    "deploy": "vp build && wrangler deploy -c dist/server/wrangler.json",
     "db:migrate:local": "wrangler d1 migrations apply VAULT_DB --local && wrangler d1 migrations apply AUTH_DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply VAULT_DB --remote && wrangler d1 migrations apply AUTH_DB --remote",
+    "deploy": "vp build && node scripts/assert-no-harness.mjs && wrangler deploy -c dist/server/wrangler.json",
+    "dev": "vp dev",
+    "e2e": "node --experimental-strip-types e2e/boot.e2e.ts",
+    "preview": "vp preview",
+    "test": "vp test",
     "types": "wrangler types"
   },
   "dependencies": {

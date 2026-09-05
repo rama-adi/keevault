@@ -15,6 +15,7 @@ import {
 } from "@env-vault/vault-store";
 import { z } from "zod";
 
+import { log } from "../log.ts";
 import { writeAuditEvent, type AuditMetadataValue } from "./audit.ts";
 import type { VaultContext } from "./context.ts";
 import { requireEnvironment } from "./projects.ts";
@@ -96,9 +97,17 @@ export async function createBootstrapToken(
   return { token: minted.token, summary: toBootstrapTokenSummary(row) };
 }
 
+/** The reason recorded on every boot canceled by a token revocation. */
+export const TOKEN_REVOKED_REASON = "bootstrap token revoked";
+
 /**
- * Revoke a token. Cancelling the boots it opened is the Durable Object's job;
- * this marks the row so no new socket authenticates (spec section 38).
+ * Revoke a token and cancel the boots it opened (spec section 38).
+ *
+ * The order is deliberate. The row is marked revoked first, so a failure while
+ * reaching the Durable Object cannot leave a usable token behind. The boots are
+ * cancelled second, and a failure there is logged and swallowed: the token is
+ * already dead, so no new socket can authenticate with it, and the live boots
+ * still fall over on their own TTL.
  */
 export async function revokeBootstrapToken(
   context: VaultContext,
@@ -121,6 +130,19 @@ export async function revokeBootstrapToken(
       ]),
     },
   );
+  try {
+    await context.boots.cancelForToken(token.environmentId, tokenRowId, TOKEN_REVOKED_REASON);
+  } catch {
+    log({
+      level: "warn",
+      event: "bootstrap-token.revoked.cancel-failed",
+      outcome: "error",
+      reason: "boot_cancel_failed",
+      projectId: environment.projectId,
+      environmentId: token.environmentId,
+      tokenId: tokenRowId,
+    });
+  }
 }
 
 export interface UpdateTokenCidrsInput {

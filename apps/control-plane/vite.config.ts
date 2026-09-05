@@ -31,6 +31,35 @@ function externalizeWorkersModules(): Plugin {
  */
 const underTest = process.env["VITEST"] !== undefined;
 
+/**
+ * Swap the Worker entry for the end-to-end harness entry.
+ *
+ * The harness needs seed and approve routes that a passkey cannot provide
+ * headlessly, so they live in `src/server/worker.e2e.ts`. This plugin is the
+ * only switch that pulls that module in, and it exists only when `VAULT_E2E=1`
+ * is set at dev or build time. A normal `vp dev` or `vp build` never resolves
+ * the module, so the shipped bundle cannot contain it.
+ *
+ * Only the entry itself is redirected. The harness module imports the normal
+ * worker to delegate every request that is not a harness route, and that import
+ * carries an importer, so it resolves to the real file.
+ */
+function selectHarnessWorkerEntry(): Plugin | null {
+  if (process.env["VAULT_E2E"] !== "1") return null;
+  const normal = fileURLToPath(new URL("./src/server/worker.ts", import.meta.url));
+  const harness = fileURLToPath(new URL("./src/server/worker.e2e.ts", import.meta.url));
+  return {
+    name: "env-vault:e2e-worker-entry",
+    enforce: "pre",
+    resolveId(id: string, importer: string | undefined) {
+      // The harness itself imports the normal worker to delegate every request
+      // that is not a harness route. That import must not loop back.
+      if (importer === harness) return null;
+      return id === normal ? harness : null;
+    },
+  };
+}
+
 export default defineConfig({
   resolve: {
     // shadcn writes `@/...` imports. tsconfig paths cover the type checker; the
@@ -38,6 +67,7 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   plugins: [
+    selectHarnessWorkerEntry(),
     externalizeWorkersModules(),
     underTest ? null : cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),
