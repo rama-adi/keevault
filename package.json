@@ -6,10 +6,13 @@
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
     "dev": "vp run control-plane#dev",
+    "dev:marketing": "vp run keevault-marketing#dev",
     "prepare": "vp config"
   },
   "devDependencies": {
     "@oxlint/plugins": "catalog:",
+    "@types/node": "catalog:",
+    "esbuild": "0.28.2",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

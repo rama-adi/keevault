@@ -1,0 +1,36 @@
+---
+title: "Security basics"
+description: "Know what approval protects and how to handle application credentials."
+---
+
+Keevault keeps secret values out of your source code, container image, and
+platform configuration. Your deployment holds a bootstrap token so it can
+request access. Possessing that token alone does not approve a request.
+
+## Approve only starts you expect
+
+Check the request against the deployment you intended to launch. Workload
+claims such as a commit or image name are not proof by themselves. Review
+verified evidence when your team has configured it. Approval grants that
+application access to every secret in its selected environment.
+
+Use a separate environment when applications should receive different secrets.
+The client's `requiredSecrets` option checks for missing values; it does not
+limit which values an application receives.
+
+## Protect running applications
+
+After approval, your application has plaintext secrets in its environment.
+An attacker who controls that application or its host can access those values.
+Keep your runtime secure and avoid writing secrets to logs or error reports.
+
+Revoking a token stops future access through that token. It does not erase
+values already received by a running application. If a credential may have
+been exposed, replace it at its issuing service and update it in keevault.
+
+## Protect your dashboard account
+
+Use your own passkey and verify sensitive actions only when you initiated them.
+Report an unfamiliar approval request or a lost passkey device to your vault
+administrator. Ask them for help if you lose access; do not assume a password
+reset is available.

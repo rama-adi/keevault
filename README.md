@@ -40,6 +40,7 @@ D1 never holds the master key and never holds plaintext secret values. The Durab
 | Path                       | What it is                                                                                                                                       |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `apps/control-plane`       | The Cloudflare Worker: TanStack Start dashboard, Better Auth, the `/bootstrap/v1` WebSocket, `EnvironmentSessionDO`, provenance verifiers.       |
+| `apps/keevault-marketing`  | TanStack Start marketing site and Fumadocs user documentation, styled with Tailwind CSS.                                                         |
 | `apps/env-client`          | The Go bootstrap client (binary `keevault`) that runs inside a workload container and execs the target process after decrypting its environment. |
 | `packages/crypto`          | `@keevault/crypto`: Web Crypto implementation of the key hierarchy, envelopes, bootstrap tokens, fingerprints, CIDR matching.                    |
 | `packages/protocol`        | `@keevault/protocol`: zod schemas and TypeScript types for every WebSocket message, the boot state machine, and canonical string builders.       |
@@ -48,7 +49,7 @@ D1 never holds the master key and never holds plaintext secret values. The Durab
 | `protocol`                 | `websocket-v1.md`, the generated JSON schema, and shared test vectors.                                                                           |
 | `crypto/test-vectors`      | Cross-language test vectors the TypeScript and Go crypto tests both load.                                                                        |
 | `examples/zeabur-node-app` | A minimal Node app and Dockerfile showing `keevault` as the container entrypoint.                                                                |
-| `docs`                     | Operator and engineering documentation. See `docs/README.md` for the full index.                                                                 |
+| `docs`                     | Hosting runbooks, architecture, specifications, audits, and integration test matrices. See `docs/README.md` for the full index.                  |
 
 ## Run a workload
 
@@ -70,9 +71,9 @@ tokens out of this file. The token selects the environment; `environmentId` chec
 that the server approved the one you expected. `requiredSecrets` checks presence;
 it does not filter the approved environment's secrets.
 
-Flags override environment variables, which override file settings. A command
-after `--` overrides the configured command. Use `--config path/to/keevault.json`
-for an explicit file. See [client configuration](apps/env-client/README.md).
+Put the application command in `keevault.json` and run `keevault` without
+command arguments. Use `--config path/to/keevault.json` to select another file.
+See [client configuration](apps/keevault-marketing/content/docs/client.mdx).
 
 Container builds download a precompiled Linux binary from R2 and verify a pinned
 SHA-256 checksum. They do not need a Go toolchain. Releases provide `amd64` and
@@ -110,6 +111,12 @@ Start the dashboard:
 vp run dev
 ```
 
+Start the marketing site and user documentation in a separate terminal:
+
+```bash
+vp run dev:marketing
+```
+
 Run the checks and tests:
 
 ```bash
@@ -128,12 +135,12 @@ go test ./...
 
 ## Further reading
 
+User documentation is served by `apps/keevault-marketing` at `/docs`.
+
+- [Getting started](apps/keevault-marketing/content/docs/getting-started.mdx) covers the first approved workload.
+- [Managing secrets](apps/keevault-marketing/content/docs/managing-secrets.mdx) and [approving boots](apps/keevault-marketing/content/docs/approving-boots.mdx) cover everyday use.
+- [Operations](docs/operations.md) covers vault hosting and administration.
+- [Architecture](docs/architecture.md) and [threat model](docs/threat-model.md) explain the security boundaries.
+- [Documentation index](docs/README.md) links to all operator guides and engineering references.
 - [Latest code audit](docs/audit-2026-09-09.md) covers fixes and remaining rotation and setup concurrency risks.
-- `docs/README.md` is the index into every document below, ordered for a new operator.
-- `docs/architecture.md` covers components, request paths, the key hierarchy, and the boot state machine.
-- `docs/operations.md` is the deployment runbook, from creating the D1 databases to rotating keys.
-- `docs/dashboard.md` is a page-by-page guide to the operator dashboard.
-- `docs/threat-model.md`, `docs/key-rotation.md`, `docs/incident-response.md`, and `docs/provenance.md` cover security design, key rotation, incident runbooks, and the provenance verification model.
-- `docs/zeabur.md` is the Zeabur integration test matrix.
-- `docs/engineering-brief.md` pins the exact byte-level encodings both the TypeScript and Go implementations must agree on, and tracks implementation status.
-- `protocol/websocket-v1.md` is the normative WebSocket protocol specification.
+- [WebSocket protocol](protocol/websocket-v1.md) defines the normative wire contract.

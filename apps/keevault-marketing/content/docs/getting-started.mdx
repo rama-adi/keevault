@@ -1,0 +1,72 @@
+---
+title: "Getting started"
+description: "Run your application with secrets supplied by Keevault."
+---
+
+Have your vault URL, environment ID, bootstrap token, and keevault client binary
+ready. You'll also need an admin or owner account to approve the application
+start, or a teammate who can approve it.
+
+## Prepare the environment
+
+In the dashboard, open your project and environment. Add the values your
+application needs from the Secrets tab. Keep production and development in
+separate environments.
+
+Create a bootstrap token from the Tokens tab if you don't already have one.
+Copy it when it appears and save it as `VAULT_BOOTSTRAP_TOKEN` in your deployment
+platform's environment settings. The token is shown once. Keep it out of source
+control and container images.
+
+See [managing secrets](/docs/managing-secrets) for environment and token settings.
+
+## Configure the command
+
+Install the keevault client so that it is executable and available on your
+application's `PATH`. Add `keevault.json` to the application's working directory:
+
+```json
+{
+  "vaultUrl": "https://vault.example.com",
+  "environmentId": "env_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "requiredSecrets": ["DATABASE_URL", "API_KEY"],
+  "command": ["node", "server.js"]
+}
+```
+
+Replace the example URL, environment ID, secret names, and command with your own.
+This file holds launch settings, not secret values.
+
+`environmentId` checks that approval is for the environment you expected.
+`requiredSecrets` checks that each named secret is present. Your application
+still receives all secrets in that environment.
+
+With `VAULT_BOOTSTRAP_TOKEN` set in the process environment, run:
+
+```bash
+keevault
+```
+
+The client reads the config from the working directory and waits for approval.
+See the [Docker example](/docs/examples/docker) for a complete container integration.
+
+## Approve the start
+
+Open Boots in the dashboard and find the pending request. Check that it matches
+the deployment you just started. An admin or owner can approve it after a recent
+passkey verification.
+
+After approval, keevault starts the configured command with the secrets as
+environment variables. In Node.js, your application reads them normally:
+
+```js
+const databaseUrl = process.env.DATABASE_URL;
+const apiKey = process.env.API_KEY;
+```
+
+Keep these values out of logs and API responses. Each new start needs its own
+approval, including restarts and redeployments. Updating a value in the vault
+does not change the environment of an already running process.
+
+See [approving boots](/docs/approving-boots) for the approval workflow and
+[client configuration](/docs/client) for other launch settings.

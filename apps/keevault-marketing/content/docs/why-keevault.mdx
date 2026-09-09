@@ -1,0 +1,24 @@
+---
+title: "Why Keevault"
+description: "Why I built Keevault and chose Cloudflare to host it."
+---
+
+The [Zeabur environment-variable incident](https://status.zeabur.com/incident/1037896)
+in August 2026 prompted this project. Zeabur confirmed credential exposure;
+[ABMedia's coverage on Binance Square](https://www.binance.com/en/square/post/361221256902006)
+reported unauthorized AI-service charges.
+
+I wanted to store app secrets separately from the deployment platform's saved
+variables and approve each process before it receives them. Keevault adds that
+approval step. It cannot protect secrets from someone controlling an already
+approved app or its host. See [security basics](/docs/security).
+
+## Why Cloudflare
+
+Keevault is primarily designed to be hosted on Cloudflare. I chose it because
+I trust its security controls more for storing my app secrets. Its published
+[security policies and independent certifications](https://www.cloudflare.com/trust-hub/)
+gave me more confidence in that choice.
+
+Your applications can still run on Zeabur, a VPS, or another container platform.
+Cloudflare hosts the vault; your app requests its secrets when it starts.

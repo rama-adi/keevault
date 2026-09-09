@@ -1,0 +1,73 @@
+---
+title: "Simple Node.js app"
+description: "Start an HTTP server with secrets from Keevault."
+---
+
+Use Keevault with a Node app that reads `process.env`. This example needs no
+npm dependencies. Create `API_KEY` in your Keevault environment first.
+
+## Add the server
+
+```js title="server.mjs"
+import { createServer } from "node:http";
+
+if (!process.env.API_KEY) {
+  throw new Error("API_KEY is required");
+}
+
+createServer((_request, response) => {
+  response.writeHead(200, { "content-type": "text/plain" });
+  response.end("App started with its Keevault environment.\n");
+}).listen(3000, "0.0.0.0", () => {
+  console.log("Listening on port 3000");
+});
+```
+
+The server checks that the key exists without printing or returning it. In your
+app, use `process.env.API_KEY` when calling the service that issued the key.
+
+## Configure Keevault
+
+Save this beside `server.mjs`, using your own vault URL and environment ID:
+
+```json title="keevault.json"
+{
+  "vaultUrl": "https://vault.example.com",
+  "environmentId": "env_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "requiredSecrets": ["API_KEY"],
+  "command": ["node", "server.mjs"]
+}
+```
+
+Have Node and a Keevault client for your operating system on `PATH`. Set
+`VAULT_BOOTSTRAP_TOKEN` in your shell, then run from this directory:
+
+```sh
+keevault
+```
+
+Approve the request in your dashboard. From a second terminal:
+
+```sh
+curl http://localhost:3000
+```
+
+```text
+App started with its Keevault environment.
+```
+
+The server doesn't listen until approval. Restarting it requires a new approval.
+
+## Use an existing npm app
+
+Keep your existing start script and change only the JSON command:
+
+```json
+"command": ["npm", "run", "start"]
+```
+
+Install dependencies before running Keevault. The application command always
+comes from `keevault.json`.
+
+For a container, follow the [Docker example](/docs/examples/docker). For a
+process without an HTTP server, see the [background worker](/docs/examples/background-worker).

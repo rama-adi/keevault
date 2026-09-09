@@ -216,22 +216,28 @@ Reasons:
 - better memory control than Node;
 - can use `execve` semantics to replace itself with the actual application.
 
-Conceptual usage:
+Configure the application in `keevault.json`:
 
-```bash
-keevault -- npm run start
+```json
+{
+  "vaultUrl": "https://vault.example.com",
+  "environmentId": "env_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "requiredSecrets": ["DATABASE_URL"],
+  "command": ["npm", "run", "start"]
+}
 ```
 
-or:
+Run `keevault` without command arguments. The application command comes from
+this file. In a container:
 
 ```dockerfile
-ENTRYPOINT ["/usr/local/bin/keevault", "--"]
-CMD ["node", "server.js"]
+COPY keevault.json ./keevault.json
+ENTRYPOINT ["/usr/local/bin/keevault"]
 ```
 
 The example image downloads a precompiled Linux binary from a versioned R2
 path during image build and verifies a pinned checksum. CI produces amd64 and
-arm64 artifacts. See [release setup](./releases.md).
+arm64 artifacts. See [release setup](releases.md).
 
 After approval and server confirmation of consumption, the bootstrapper executes
 the target command with the decrypted environment.
@@ -1955,7 +1961,7 @@ Already CONSUMED sessions cannot be retroactively revoked because the workload a
 
 These procedures describe the intended result. The current implementation does
 not serialize the snapshot and commit against concurrent secret writes or key
-creation. Follow the coordination requirements in [key rotation](./key-rotation.md)
+creation. Follow the coordination requirements in [key rotation](key-rotation.md)
 and the unresolved finding in [the audit](./audit-2026-09-09.md).
 
 ## Environment key

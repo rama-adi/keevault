@@ -1,0 +1,117 @@
+---
+title: "Background worker"
+description: "Run a background service with credentials from Keevault."
+---
+
+This Node.js 22+ worker sends a heartbeat to an endpoint you control. It reads
+`API_URL` and `API_KEY` from its environment, makes one request at a time, and
+waits 60 seconds between attempts.
+
+The complete runnable example is in `examples/background-worker` in the
+repository. It has no package dependencies.
+
+## Prepare the endpoint and secrets
+
+Use your own endpoint that accepts a `POST` request with a bearer token and this
+JSON body:
+
+```json
+{ "event": "heartbeat" }
+```
+
+This is an example contract for your service, not a Keevault API. Add its URL as
+`API_URL` and its bearer token as `API_KEY` in your Keevault environment. Use
+HTTPS outside local testing.
+
+## Configure the worker
+
+Place this `keevault.json` next to `worker.mjs` and replace the vault URL and
+environment ID:
+
+```json
+{
+  "vaultUrl": "https://vault.example.com",
+  "environmentId": "env_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "requiredSecrets": ["API_URL", "API_KEY"],
+  "command": ["node", "worker.mjs"]
+}
+```
+
+## Add the worker
+
+Save this as `worker.mjs`. It sends one request at a time and stops on SIGTERM
+or Ctrl+C:
+
+```js title="worker.mjs"
+import { setTimeout } from "node:timers/promises";
+
+const { API_URL, API_KEY } = process.env;
+
+if (!API_URL || !API_KEY) {
+  throw new Error("API_URL and API_KEY are required");
+}
+
+const endpoint = new URL(API_URL);
+if (!["https:", "http:"].includes(endpoint.protocol)) {
+  throw new Error("API_URL must use HTTP or HTTPS");
+}
+
+const shutdown = new AbortController();
+const stop = () => shutdown.abort();
+process.once("SIGTERM", stop);
+process.once("SIGINT", stop);
+
+console.log("Heartbeat worker started");
+
+while (!shutdown.signal.aborted) {
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ event: "heartbeat" }),
+      signal: AbortSignal.any([shutdown.signal, AbortSignal.timeout(10_000)]),
+    });
+    await response.body?.cancel();
+    console.log(response.ok ? "Heartbeat sent" : `Heartbeat rejected: ${response.status}`);
+  } catch {
+    if (shutdown.signal.aborted) break;
+    console.error("Heartbeat failed; retrying in 60 seconds");
+  }
+
+  try {
+    await setTimeout(60_000, undefined, { signal: shutdown.signal });
+  } catch {
+    break;
+  }
+}
+
+console.log("Heartbeat worker stopped");
+```
+
+## Run
+
+Set `VAULT_BOOTSTRAP_TOKEN` in the process environment, then run:
+
+```bash
+keevault
+```
+
+[Approve the boot](/docs/approving-boots) to start the worker. Failed requests
+retry on the next interval. Logs contain status messages, not credentials or
+response bodies.
+
+## Stop and restart
+
+Send SIGTERM or press Ctrl+C to stop the worker. It cancels an active request
+or delay and exits. Your process manager can restart it, but each new start
+needs another Keevault approval.
+
+This example does not store work or guarantee delivery. For a job processor,
+keep your queue's acknowledgement and retry handling in the worker; Keevault
+supplies the credentials when that process starts.
+
+See the [Node.js example](/docs/examples/nodejs) for an HTTP application or the
+[Docker example](/docs/examples/docker) to package a service in a container.

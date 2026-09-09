@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -12,10 +13,15 @@ import (
 )
 
 func TestParseArgsPrefersFlagsOverEnvironment(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("KEEVAULT_CONFIG", "")
+	if err := os.WriteFile("keevault.json", []byte(`{"command":["node","server.js"]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("VAULT_URL", "https://from-env.example.com")
 	t.Setenv("VAULT_BOOTSTRAP_TOKEN", "token-from-env")
 
-	got, command, err := parseArgs([]string{"--vault-url", "https://from-flag.example.com", "--", "node", "server.js"}, &bytes.Buffer{})
+	got, command, err := parseArgs([]string{"--vault-url", "https://from-flag.example.com"}, &bytes.Buffer{})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -31,6 +37,8 @@ func TestParseArgsPrefersFlagsOverEnvironment(t *testing.T) {
 }
 
 func TestParseArgsRequiresACommand(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("KEEVAULT_CONFIG", "")
 	_, _, err := parseArgs([]string{"--vault-url", "https://vault.example.com"}, &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("a run without a command must fail")
@@ -172,5 +180,54 @@ func TestRunMainReportsConfigErrors(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "keevault:") {
 		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestParseArgsRejectsCommandOverrides(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("KEEVAULT_CONFIG", "")
+	if err := os.WriteFile("keevault.json", []byte(`{"command":["node","server.js"]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"--", "npm", "run", "start"},
+		{"--"},
+		{"npm", "run", "start"},
+		{"--vault-log-level", "debug", "--", "node", "other.js"},
+		{"--vault-log-level", "debug", "node", "other.js"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			stderr := &bytes.Buffer{}
+			if code := runMain(args, stderr); code != client.ExitConfig {
+				t.Fatalf("exit code = %d, want %d", code, client.ExitConfig)
+			}
+			if !strings.Contains(stderr.String(), "define command in keevault.json") {
+				t.Fatalf("expected configuration guidance, got %q", stderr.String())
+			}
+		})
+	}
+}
+
+func TestParseArgsSelectsCommandOnlyFromConfiguration(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("KEEVAULT_CONFIG", "environment.json")
+	files := map[string]string{
+		"keevault.json":    `{"command":["node","default.js"]}`,
+		"environment.json": `{"command":["node","environment.js"]}`,
+		"selected.json":    `{"command":["npm","run","start","--","--label=$HOME a b"]}`,
+	}
+	for name, body := range files {
+		if err := os.WriteFile(name, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, command, err := parseArgs(nil, &bytes.Buffer{})
+	if err != nil || strings.Join(command, " ") != "node environment.js" {
+		t.Fatalf("environment config selection: %v, %v", command, err)
+	}
+	_, command, err = parseArgs([]string{"--config", "selected.json"}, &bytes.Buffer{})
+	want := []string{"npm", "run", "start", "--", "--label=$HOME a b"}
+	if err != nil || !reflect.DeepEqual(command, want) {
+		t.Fatalf("configured argv = %q, want %q; error: %v", command, want, err)
 	}
 }

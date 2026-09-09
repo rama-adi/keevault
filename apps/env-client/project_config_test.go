@@ -25,9 +25,9 @@ func TestProjectConfigPrecedence(t *testing.T) {
 	}
 	t.Setenv("VAULT_URL", "https://env.example")
 	t.Setenv("KEEVAULT_ENVIRONMENT_ID", "env_2")
-	s, command, err = parseArgs([]string{"--", "echo", "$HOME"}, &bytes.Buffer{})
-	if err != nil || s.url != "https://env.example" || s.environmentID != "env_2" || !reflect.DeepEqual(command, []string{"echo", "$HOME"}) {
-		t.Fatalf("environment/argv precedence failed: %+v %v %v", s, command, err)
+	s, command, err = parseArgs(nil, &bytes.Buffer{})
+	if err != nil || s.url != "https://env.example" || s.environmentID != "env_2" || !reflect.DeepEqual(command, []string{"node", "a b.js"}) {
+		t.Fatalf("environment precedence failed: %+v %v %v", s, command, err)
 	}
 	s, _, err = parseArgs([]string{"--vault-url", "https://flag.example", "--environment-id", "env_3"}, &bytes.Buffer{})
 	if err != nil || s.url != "https://flag.example" || s.environmentID != "env_3" {
@@ -36,7 +36,7 @@ func TestProjectConfigPrecedence(t *testing.T) {
 }
 
 func TestProjectConfigRejectsInvalidFiles(t *testing.T) {
-	for _, content := range []string{`null`, `[]`, `{`, `{ "unknown": true }`, `{} {}`, `{"command":[]}`, `{"command":"node"}`, `{"command":[""]}`, `{"command":["node","\u0000"]}`, `{"requiredSecrets":["BAD-NAME"]}`, `{"requiredSecrets":["A","A"]}`, `{"environmentId":" env_1"}`} {
+	for _, content := range []string{`{}`, `{"command":null}`, `null`, `[]`, `{`, `{ "unknown": true }`, `{} {}`, `{"command":[]}`, `{"command":"node"}`, `{"command":[""]}`, `{"command":["node","\u0000"]}`, `{"command":["node"],"requiredSecrets":["BAD-NAME"]}`, `{"command":["node"],"requiredSecrets":["A","A"]}`, `{"command":["node"],"environmentId":" env_1"}`} {
 		t.Run(content, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.json")
 			if err := os.WriteFile(path, []byte(content), 0600); err != nil {

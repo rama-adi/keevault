@@ -1,0 +1,32 @@
+---
+title: "Developer guide"
+description: "Connect your application to Keevault and launch it with approved secrets."
+---
+
+Keevault supplies secrets to your application as environment variables. The
+client waits for approval before starting your command, so you can keep secret
+values out of source code, config files, and container images.
+
+You'll need a vault URL, an environment with your application's secrets, a
+bootstrap token, and the keevault client binary. Approving a start requires an
+admin or owner account; a teammate can approve it for you.
+
+## Integrate your application
+
+[Getting started](/docs/getting-started) walks through configuring
+`keevault.json`, running the client, and reading secrets in your application.
+
+For a container deployment, follow the [Docker example](/docs/examples/docker).
+
+## Configure and maintain the integration
+
+- [Client configuration](/docs/client) covers JSON launch settings and exit codes.
+- [Managing secrets](/docs/managing-secrets) covers environment values and bootstrap tokens.
+- [Approving boots](/docs/approving-boots) explains what happens at each start or redeployment.
+- [Security basics](/docs/security) explains the limits of approval and what your application must protect.
+
+## Examples
+
+- [Simple Node.js app](/docs/examples/nodejs): an HTTP server that reads `process.env`.
+- [Docker](/docs/examples/docker): build an image and approve its first start.
+- [Background worker](/docs/examples/background-worker): run a service without an HTTP port.

@@ -67,7 +67,7 @@ func New(cfg Config) (*Session, error) {
 		return nil, exitf(ExitConfig, "logger is required")
 	}
 	if len(cfg.Command) == 0 {
-		return nil, exitf(ExitConfig, "no command given, use: keevault [flags] -- <command> [args...]")
+		return nil, exitf(ExitConfig, "no command configured; define command in keevault.json")
 	}
 	if _, err := vaultcrypto.ParseBootstrapToken(cfg.Token); err != nil {
 		return nil, exitf(ExitConfig, "VAULT_BOOTSTRAP_TOKEN: %v", err)

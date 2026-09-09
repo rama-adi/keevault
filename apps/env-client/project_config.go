@@ -20,15 +20,11 @@ type projectConfig struct {
 
 func loadProjectConfig(path string) (projectConfig, error) {
 	var config projectConfig
-	explicit := path != ""
-	if !explicit {
+	if path == "" {
 		path = "keevault.json"
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		if !explicit && os.IsNotExist(err) {
-			return config, nil
-		}
 		return config, fmt.Errorf("configuration file: %w", err)
 	}
 	defer file.Close()
@@ -56,7 +52,7 @@ func loadProjectConfig(path string) (projectConfig, error) {
 	if strings.TrimSpace(config.EnvironmentID) != config.EnvironmentID || strings.ContainsRune(config.EnvironmentID, '\x00') {
 		return config, fmt.Errorf("environmentId must not contain surrounding whitespace or NUL")
 	}
-	if config.Command != nil && (len(config.Command) == 0 || strings.TrimSpace(config.Command[0]) == "") {
+	if len(config.Command) == 0 || strings.TrimSpace(config.Command[0]) == "" {
 		return config, fmt.Errorf("command must be a nonempty argv array")
 	}
 	for _, arg := range config.Command {

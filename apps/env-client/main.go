@@ -3,7 +3,7 @@
 //
 // Usage:
 //
-//	keevault [flags] -- <command> [args...]
+//	keevault [flags]
 package main
 
 import (
@@ -91,7 +91,7 @@ func parseArgs(args []string, stderr io.Writer) (settings, []string, error) {
 		fmt.Fprint(stderr, usage)
 		fs.PrintDefaults()
 	}
-	fs.StringVar(&configPath, "config", env("KEEVAULT_CONFIG"), "configuration file, defaults to ./keevault.json when present")
+	fs.StringVar(&configPath, "config", env("KEEVAULT_CONFIG"), "configuration file, defaults to ./keevault.json")
 	fs.StringVar(&s.environmentID, "environment-id", env("KEEVAULT_ENVIRONMENT_ID"), "expected environment ID")
 	fs.StringVar(&s.url, "vault-url", env("VAULT_URL"), "vault endpoint, https or wss")
 	fs.StringVar(&s.token, "vault-bootstrap-token", env("VAULT_BOOTSTRAP_TOKEN"), "bootstrap token (VAULT_BOOTSTRAP_TOKEN)")
@@ -106,11 +106,19 @@ func parseArgs(args []string, stderr io.Writer) (settings, []string, error) {
 	fs.StringVar(&s.pendingTimeout, "vault-pending-timeout", env("VAULT_PENDING_TIMEOUT"), "how long to wait for approval, default 30m")
 	fs.StringVar(&s.logLevel, "vault-log-level", env("VAULT_LOG_LEVEL"), "debug, info, warn or error")
 
+	for _, arg := range args {
+		if arg == "--" {
+			return settings{}, nil, &client.ExitError{Code: client.ExitConfig, Err: errors.New("-- is not supported; define command in keevault.json")}
+		}
+	}
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return settings{}, nil, &client.ExitError{Code: client.ExitConfig, Err: errors.New("no command given")}
+			return settings{}, nil, &client.ExitError{Code: client.ExitConfig, Err: errors.New("configuration required; define command in keevault.json")}
 		}
 		return settings{}, nil, &client.ExitError{Code: client.ExitConfig, Err: err}
+	}
+	if fs.NArg() != 0 {
+		return settings{}, nil, &client.ExitError{Code: client.ExitConfig, Err: errors.New("command arguments are not supported; define command in keevault.json")}
 	}
 	file, err := loadProjectConfig(configPath)
 	if err != nil {
@@ -125,28 +133,19 @@ func parseArgs(args []string, stderr io.Writer) (settings, []string, error) {
 		s.environmentID = file.EnvironmentID
 	}
 	s.requiredSecrets = file.RequiredSecrets
-	command := fs.Args()
-	if len(command) == 0 {
-		command = file.Command
-	}
-	if len(command) == 0 {
-		fs.Usage()
-		return settings{}, nil, &client.ExitError{
-			Code: client.ExitConfig,
-			Err:  errors.New("no command given, use: keevault [flags] -- <command> [args...]"),
-		}
-	}
-	return s, command, nil
+	return s, file.Command, nil
 }
 
 const usage = `keevault fetches an approved environment from the vault and then
 replaces itself with the target command.
 
 Usage:
-  keevault [flags] -- <command> [args...]
+  keevault [flags]
 
-Optional ./keevault.json defines vaultUrl, environmentId, requiredSecrets and
-command. Flags override environment variables, which override the file.
+./keevault.json is required and defines the command argv array. It can also
+define vaultUrl, environmentId and requiredSecrets. Select another JSON file
+with --config. Command arguments and the -- separator are not accepted.
+For other settings, flags override environment variables, which override the file.
 Legacy --vault-* flags use VAULT_* variables. --config uses KEEVAULT_CONFIG
 and --environment-id uses KEEVAULT_ENVIRONMENT_ID. Commands are argv arrays;
 no shell expansion is performed.

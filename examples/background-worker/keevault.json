@@ -1,0 +1,6 @@
+{
+  "vaultUrl": "https://vault.example.com",
+  "environmentId": "env_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "requiredSecrets": ["API_URL", "API_KEY"],
+  "command": ["node", "worker.mjs"]
+}

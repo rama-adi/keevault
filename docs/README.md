@@ -1,23 +1,33 @@
-# Documentation index
+# Repository documentation
 
-Read these in order if you are operating keevault for the first time.
+The public documentation is for people connecting applications to keevault and
+using its dashboard. Its source lives in `apps/keevault-marketing/content/docs`
+and the marketing app serves it at `/docs`.
 
-1. **[architecture.md](./architecture.md)**. Components, request paths, the key hierarchy with exact AAD strings, the boot state machine, and what lives in D1 versus the Durable Object.
-2. **[operations.md](./operations.md)**. The deployment runbook: create the D1 databases, generate secrets, run the first-owner ceremony, then day-two tasks like adding secrets, approving boots, and rotating keys.
-3. **[dashboard.md](./dashboard.md)**. A page-by-page guide to the operator dashboard, the step-up rule, and the role matrix as implemented.
-4. **[threat-model.md](./threat-model.md)**. What the vault protects, against whom, and how each attacker scenario is stopped.
-5. **[provenance.md](./provenance.md)**. The claims, evidence, verifier, and policy model that backs the approval screen.
-6. **[key-rotation.md](./key-rotation.md)**. The three key rotation runbooks: environment key, project key, and master key.
-7. **[incident-response.md](./incident-response.md)**. Detect, contain, eradicate, recover for each incident type, from a leaked token to a compromised admin account.
-8. **[zeabur.md](./zeabur.md)**. The Zeabur integration test matrix. Every row starts unrun until an operator runs it against a real Zeabur project.
-9. **[engineering-brief.md](./engineering-brief.md)**. The byte-level contract between the TypeScript and Go implementations, plus current implementation status.
+- [Getting started](../apps/keevault-marketing/content/docs/getting-started.mdx)
+- [Managing secrets](../apps/keevault-marketing/content/docs/managing-secrets.mdx)
+- [Approving boots](../apps/keevault-marketing/content/docs/approving-boots.mdx)
+- [Client configuration](../apps/keevault-marketing/content/docs/client.mdx)
+- [Security basics](../apps/keevault-marketing/content/docs/security.mdx)
 
-[security-review-v1.md](./security-review-v1.md) records the earlier security review. Read it alongside the later audit below; historical conclusions do not override newer findings.
+## Hosting and administration
 
-[product-specs.md](./product-specs.md) describes the intended product and marks known implementation gaps. [Client configuration](../apps/env-client/README.md) documents the implemented launch settings.
+These guides remain in the repository for people maintaining a vault deployment:
 
-See [audit-2026-09-09.md](./audit-2026-09-09.md) for the latest review, fixes, and unresolved concurrency findings.
+- [Operations](./operations.md)
+- [Detailed dashboard reference](./dashboard.md)
+- [Key rotation](./key-rotation.md)
+- [Incident response](./incident-response.md)
+- [Publishing client releases](./releases.md)
 
-See [releases.md](./releases.md) for publishing precompiled clients to R2 and pinning container downloads.
+## Architecture, specifications, and reviews
 
-The normative wire protocol lives outside this directory at `protocol/websocket-v1.md`, alongside the generated JSON schema and test vectors.
+- [Architecture](./architecture.md)
+- [Threat model](./threat-model.md)
+- [Provenance](./provenance.md)
+- [Latest audit](./audit-2026-09-09.md)
+- [Engineering brief](./engineering-brief.md)
+- [Product specification](./product-specs.md)
+- [Security review](./security-review-v1.md)
+- [Zeabur integration matrix](./zeabur.md)
+- [WebSocket protocol](../protocol/websocket-v1.md)

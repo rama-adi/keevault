@@ -1,0 +1,42 @@
+---
+title: "Approving boots"
+description: "Review an application's request before allowing it to receive secrets."
+---
+
+A boot is one attempt to start an application with a keevault environment.
+The application waits until an admin or owner approves the request. A restart
+or redeployment creates a new request.
+
+## Review the request
+
+Open Boots in the dashboard and select the pending request for your environment.
+Check that its timing and source match the deployment you started. Review the
+repository, commit, image, and deployment details when they are available.
+
+Details claimed by an application are not proof on their own. Check the evidence
+and verification results shown alongside them. If details are missing or do not
+match what you expected, investigate before approving. Follow your team's verification requirements.
+
+Unexpected requests or several simultaneous requests can mean a deployment is
+retrying or a token has been exposed. Do not approve a request just to clear the
+list.
+
+## Approve or decline
+
+Choose Approve when you are satisfied that the request is expected. Approval
+requires an admin or owner account and a passkey verification from the last
+five minutes. Complete the prompt if asked.
+
+The application receives its environment and starts its configured command.
+Approval applies to this boot only. If you decline, the waiting client exits
+without starting the application.
+
+## If the application keeps waiting
+
+Confirm that you selected the right environment and request. A client whose
+connection dropped may reconnect while preserving its request. The default
+waiting timeout is 30 minutes; your deployment may use a different setting.
+
+If the request expired or was canceled, start the client again to create a new
+one. If the token was revoked, configure a replacement. The
+[client guide](/docs/client#exit-codes) explains exit codes and connection settings.

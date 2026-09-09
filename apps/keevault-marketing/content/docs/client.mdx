@@ -1,0 +1,90 @@
+---
+title: "Client configuration"
+description: "Configure the bootstrap client and launch your application."
+---
+
+keevault fetches an approved environment from the keevault control
+plane and then replaces itself with your application. The application inherits
+the decrypted secrets as ordinary environment variables. The bootstrap process
+itself is gone by the time the application runs.
+
+## Configure your application
+
+Create `keevault.json` in your application's working directory:
+
+```json
+{
+  "vaultUrl": "https://keevault.example.com",
+  "environmentId": "env_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "requiredSecrets": ["DATABASE_URL"],
+  "command": ["npm", "run", "start"]
+}
+```
+
+Set `VAULT_BOOTSTRAP_TOKEN` in your deployment's environment, then run:
+
+```bash
+keevault
+```
+
+Keevault reads the application command from the JSON file. To change what runs,
+edit `command`.
+Keep the bootstrap token and secret values out of this file.
+
+## JSON settings
+
+| Field             | Purpose                                                                                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `vaultUrl`        | Your team's vault URL.                                                                                                                 |
+| `environmentId`   | The environment you expect to receive. The client rejects approval for a different environment.                                        |
+| `requiredSecrets` | Secret names your application needs. Startup fails if any are missing. Your application still receives all secrets in the environment. |
+| `command`         | The executable and its arguments, as a nonempty array. For example, `["npm", "run", "start"]` or `["node", "server.js"]`.              |
+
+The command runs directly without shell expansion. Relative paths resolve from
+the working directory where you run keevault. Keep the config there too, or use
+`KEEVAULT_CONFIG` to select another file.
+
+Unknown fields, malformed JSON, duplicate or invalid secret names, and files
+larger than 1 MiB fail at startup. Secret names must match
+`^[A-Z_][A-Z0-9_]{0,255}$`.
+
+When started, keevault requests access to the environment and waits for an
+approval. If the connection drops, it retries automatically. Once approved,
+it decrypts the secrets and runs your command with those environment variables.
+See [approving a boot](/docs/approving-boots) for the dashboard steps.
+
+The bootstrap client never returns 0 itself. After replacement, the application
+controls the exit status and may exit 0.
+
+## Docker
+
+Use keevault as your image's entrypoint and keep the application command in
+`keevault.json`. The [Docker guide](/docs/examples/docker) includes a complete Dockerfile,
+Node app, and build and run commands.
+
+## Exit codes
+
+| Code | Meaning                                                                            |
+| ---- | ---------------------------------------------------------------------------------- |
+| 0    | Never returned by the bootstrap client; the launched application may return it.    |
+| 2    | Configuration error, a missing required secret, or a command that cannot be found. |
+| 3    | An administrator declined the boot.                                                |
+| 4    | The boot expired, was canceled, or the pending timeout ran out.                    |
+| 5    | Unrecoverable transport or protocol failure, including a rejected token.           |
+
+## What is logged
+
+All logging goes to stderr, one plain line at a time:
+
+```text
+boot request created: boot_01K4M4X31X2Z5G9C7Q8D3E6F4G
+waiting for approval
+reconnecting
+approval received
+environment decrypted (7 values)
+starting application
+```
+
+Secret names, secret values, key material and the bootstrap token are never
+logged at any level. `debug` adds connection and retry detail, still without
+secret material.

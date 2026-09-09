@@ -1,0 +1,147 @@
+---
+title: "Docker"
+description: "Run a Node app in Docker with secrets supplied by Keevault."
+---
+
+This example starts a small HTTP server after you approve its request.
+The app reads `API_KEY` from its environment. No SDK or application changes
+are needed to fetch secrets.
+
+You'll need Docker, a reachable Keevault URL, an environment containing
+`API_KEY`, and a bootstrap token for that environment. Someone with admin or
+owner access must approve the boot.
+
+## Add the client to your project
+
+Get a trusted Linux Keevault binary for your container's architecture and save
+it as `keevault` beside your Dockerfile. Use the `arm64` binary for a
+`linux/arm64` image or `amd64` for `linux/amd64`. A macOS binary won't run in
+Docker. Verify the binary against the checksum supplied with your release.
+
+Your directory should contain:
+
+```text
+my-app/
+  Dockerfile
+  .dockerignore
+  keevault
+  keevault.json
+  server.mjs
+```
+
+A copy of this example lives in the repository at `examples/docker-node`.
+Its README also explains how to build the Linux client from source.
+
+## Set the launch config
+
+Create `keevault.json`. Replace the URL and environment ID with your own:
+
+```json title="keevault.json"
+{
+  "vaultUrl": "https://vault.example.com",
+  "environmentId": "env_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "requiredSecrets": ["API_KEY"],
+  "command": ["node", "server.mjs"]
+}
+```
+
+Keep secret values and the bootstrap token out of this file. The
+`requiredSecrets` list checks for missing values; the app receives all secrets
+in the approved environment.
+
+## Add an app
+
+For this example, create a server that checks for `API_KEY` without returning
+or logging its value:
+
+```js title="server.mjs"
+import { createServer } from "node:http";
+
+if (!process.env.API_KEY) {
+  throw new Error("API_KEY is required");
+}
+
+createServer((_request, response) => {
+  response.writeHead(200, { "content-type": "text/plain" });
+  response.end("App started with its Keevault environment.\n");
+}).listen(3000, "0.0.0.0", () => {
+  console.log("Listening on port 3000");
+});
+```
+
+For your own app, keep its existing code and set its start command in the JSON
+file, for example `"command": ["npm", "run", "start"]`.
+
+## Build the image
+
+```dockerfile title="Dockerfile"
+FROM node:22-slim
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --chmod=755 keevault /usr/local/bin/keevault
+COPY server.mjs keevault.json ./
+USER node
+EXPOSE 3000
+ENTRYPOINT ["/usr/local/bin/keevault"]
+```
+
+Keevault is the entrypoint. The application command comes from `keevault.json`,
+so leave out an application `CMD`. For an existing Node project, also copy its
+package files and install dependencies as you normally would.
+
+Only include the example's files in the build context:
+
+```text title=".dockerignore"
+*
+!Dockerfile
+!keevault
+!keevault.json
+!server.mjs
+```
+
+Build from this directory:
+
+```sh
+docker build -t keevault-node-example .
+```
+
+## Run and approve
+
+Set `VAULT_BOOTSTRAP_TOKEN` in your shell using the token you created in
+Keevault. Pass it to Docker by name so its value isn't part of the command:
+
+```sh
+docker run --rm --name keevault-node-example \
+  -p 127.0.0.1:3000:3000 \
+  -e VAULT_BOOTSTRAP_TOKEN \
+  keevault-node-example
+```
+
+Open Boots in the Keevault dashboard and approve the request for this
+container. Leave the container running and check the app from another terminal:
+
+```sh
+curl http://localhost:3000
+```
+
+```text
+App started with its Keevault environment.
+```
+
+The HTTP server won't listen until approval. Each restart creates a new boot
+request. Allow time for approval in your deployment's startup checks.
+
+## Use it in your deployment
+
+Push the image to your registry and set `VAULT_BOOTSTRAP_TOKEN` in the
+platform's runtime environment settings. Keep the image entrypoint and put any
+application command changes in `keevault.json`.
+
+The vault URL must be reachable from inside the container. `localhost` points
+to the container itself, not your development machine. Use your vault's HTTPS
+address for this example.
+
+See [client configuration](/docs/client) for JSON fields and exit codes, or
+[approving boots](/docs/approving-boots) if the container keeps waiting.

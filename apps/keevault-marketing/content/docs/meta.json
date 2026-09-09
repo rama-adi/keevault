@@ -1,0 +1,13 @@
+{
+  "title": "Developer docs",
+  "pages": [
+    "index",
+    "getting-started",
+    "examples",
+    "managing-secrets",
+    "approving-boots",
+    "client",
+    "security",
+    "why-keevault"
+  ]
+}
