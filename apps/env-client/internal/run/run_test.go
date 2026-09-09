@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/run"
+	"github.com/ramaadi/keevault/apps/env-client/internal/run"
 )
 
 func secret(name, value string) run.Secret {
@@ -80,7 +80,7 @@ func TestLookPath(t *testing.T) {
 	if !strings.HasSuffix(path, "/echo") {
 		t.Fatalf("look path returned %s", path)
 	}
-	if _, err := run.LookPath("vault-bootstrap-no-such-command"); err == nil {
+	if _, err := run.LookPath("keevault-no-such-command"); err == nil {
 		t.Fatal("an unknown command must be an error")
 	}
 }

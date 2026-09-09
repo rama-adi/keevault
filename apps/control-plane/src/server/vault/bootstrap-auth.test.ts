@@ -1,11 +1,11 @@
-import { generateBootstrapToken, generatePrefixedUlid } from "@env-vault/crypto";
+import { generateBootstrapToken, generatePrefixedUlid } from "@keevault/crypto";
 import {
   createEnvironment,
   createBootstrapToken,
   createProject,
   revokeBootstrapToken,
-} from "@env-vault/vault-store";
-import type { VaultDatabase } from "@env-vault/vault-store";
+} from "@keevault/vault-store";
+import type { VaultDatabase } from "@keevault/vault-store";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { createTestVault } from "../bootstrap/test-vault.ts";
@@ -161,6 +161,15 @@ describe("authenticateBootstrapRequest", () => {
       restricted.db,
     );
     expect(allowedV6.ok).toBe(true);
+  });
+
+  it("rejects unreadable CIDR policies even for loopback", async () => {
+    await fixture.db
+      .prepare("UPDATE bootstrap_tokens SET allowed_cidrs_json = ? WHERE id = ?")
+      .bind("{", fixture.tokenRowId)
+      .run();
+    const result = await authenticateBootstrapRequest(upgrade(fixture.token, "::1"), fixture.db);
+    expect(result).toMatchObject({ ok: false, reason: "cidr" });
   });
 
   it("ignores X-Forwarded-For when applying the CIDR policy", async () => {

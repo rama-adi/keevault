@@ -4,7 +4,7 @@
  * Every input here is fixed, so running this script twice produces identical files.
  * The Go implementation loads the same files and must reproduce every output.
  *
- * Run with: pnpm --filter @env-vault/crypto run vectors
+ * Run with: pnpm --filter @keevault/crypto run vectors
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";

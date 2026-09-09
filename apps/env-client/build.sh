@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build static vault-bootstrap binaries for linux/amd64 and linux/arm64.
+# Build static keevault binaries for linux/amd64 and linux/arm64.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -13,7 +13,7 @@ mkdir -p "$DIST"
 for target in linux/amd64 linux/arm64; do
   goos="${target%%/*}"
   goarch="${target##*/}"
-  out="$DIST/vault-bootstrap-$goos-$goarch"
+  out="$DIST/keevault-$goos-$goarch"
   echo "building $out"
   CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
     go build -trimpath -ldflags "-s -w" -o "$out" .

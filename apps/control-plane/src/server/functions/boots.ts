@@ -7,8 +7,8 @@
  * so the operator never sees a boot they cannot approve.
  */
 
-import { ipAllowed } from "@env-vault/crypto";
-import type { BootStatus } from "@env-vault/protocol";
+import { ipAllowed } from "@keevault/crypto";
+import type { BootStatus } from "@keevault/protocol";
 import {
   fromD1,
   getBootRequest,
@@ -21,7 +21,7 @@ import {
   updateBootRequestStatus,
   type ProvenanceMode,
   type VaultDatabase,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { z } from "zod";

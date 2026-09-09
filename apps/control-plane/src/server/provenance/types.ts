@@ -1,4 +1,4 @@
-import type { Evidence, WorkloadClaims } from "@env-vault/protocol";
+import type { Evidence, WorkloadClaims } from "@keevault/protocol";
 
 /**
  * Provenance verification interfaces (spec sections 24 and 25).

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { isRecentStepUp, STEP_UP_CLOCK_SKEW_SECONDS } from "./step-up-policy.ts";
+import { isRecentStepUp, sessionStepUpAt, STEP_UP_CLOCK_SKEW_SECONDS } from "./step-up-policy.ts";
 
 /**
  * Finding 6 in docs/security-review-v1.md. The old guard computed the age of
@@ -58,5 +58,23 @@ describe("isRecentStepUp", () => {
 
   it("refuses everything when the clock itself is unreadable", () => {
     expect(isRecentStepUp(NOW.toISOString(), new Date(Number.NaN), MAX_AGE_SECONDS)).toBe(false);
+  });
+});
+
+describe("session step-up authority", () => {
+  it.each(["/vault-setup/claim-owner", "/passkey/verify-registration", undefined])(
+    "does not grant recent-passkey authority for %s",
+    (path) => {
+      expect(sessionStepUpAt(path, NOW)).toBeNull();
+      expect(
+        isRecentStepUp(sessionStepUpAt(path, NOW)?.toISOString() ?? null, NOW, MAX_AGE_SECONDS),
+      ).toBe(false);
+    },
+  );
+
+  it("grants recent-passkey authority after an authentication assertion", () => {
+    const stamp = sessionStepUpAt("/passkey/verify-authentication", NOW);
+    expect(stamp).toEqual(NOW);
+    expect(isRecentStepUp(stamp?.toISOString() ?? null, NOW, MAX_AGE_SECONDS)).toBe(true);
   });
 });

@@ -1,34 +1,32 @@
-# Build context is the repository root:
-#   docker build -f examples/zeabur-node-app/Dockerfile .
-#
-# Stage 1 builds vault-bootstrap from apps/env-client, statically, for the
-# target architecture. Stage 2 is the actual runtime image: Node 22 plus the
-# vault-bootstrap binary as the entrypoint. No secret ever goes into either
-# stage; VAULT_URL and VAULT_BOOTSTRAP_TOKEN are Zeabur environment variables
-# supplied at deploy time, not build args and not baked into the image.
-
-FROM golang:1.26-alpine AS build
+# Build context is the repository root. See README.md for required build args.
+FROM --platform=$BUILDPLATFORM alpine:3.22 AS download
 ARG TARGETARCH
-WORKDIR /src
-COPY apps/env-client/ apps/env-client/
-WORKDIR /src/apps/env-client
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
-    go build -trimpath -ldflags "-s -w" -o /out/vault-bootstrap .
+ARG KEEVAULT_RELEASE_URL
+ARG KEEVAULT_VERSION
+ARG KEEVAULT_SHA256_AMD64
+ARG KEEVAULT_SHA256_ARM64
+RUN apk add --no-cache curl ca-certificates
+RUN set -eu; \
+    case "$KEEVAULT_RELEASE_URL" in https://*) ;; *) echo 'KEEVAULT_RELEASE_URL must use HTTPS' >&2; exit 1;; esac; \
+    echo "$KEEVAULT_VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$'; \
+    case "$TARGETARCH" in \
+      amd64) checksum="$KEEVAULT_SHA256_AMD64" ;; \
+      arm64) checksum="$KEEVAULT_SHA256_ARM64" ;; \
+      *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    echo "$checksum" | grep -Eq '^[a-fA-F0-9]{64}$'; \
+    curl --fail --show-error --silent --location --proto '=https' --proto-redir '=https' \
+      --retry 3 --connect-timeout 10 --max-time 120 \
+      "${KEEVAULT_RELEASE_URL%/}/releases/${KEEVAULT_VERSION}/keevault-linux-${TARGETARCH}" -o /keevault; \
+    echo "$checksum  /keevault" | sha256sum -c -; \
+    chmod 0755 /keevault
 
 FROM node:22-alpine
 WORKDIR /app
-COPY --from=build /out/vault-bootstrap /usr/local/bin/vault-bootstrap
-COPY examples/zeabur-node-app/package.json examples/zeabur-node-app/server.js ./
-
+COPY --from=download /keevault /usr/local/bin/keevault
+COPY examples/zeabur-node-app/package.json examples/zeabur-node-app/server.js examples/zeabur-node-app/keevault.json ./
 EXPOSE 3000
-
-# This healthcheck only tells Docker/Zeabur whether the process that is
-# currently running answers on /healthz. It does not, and must not, report
-# ready before vault-bootstrap has received an approved boot: node only
-# starts after vault-bootstrap execs into it, so there is nothing to answer
-# until that happens. See docs/zeabur.md for the readiness caveat.
+# The server starts after approval, so it cannot report healthy while waiting.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
     CMD wget -q -O- http://127.0.0.1:3000/healthz || exit 1
-
-ENTRYPOINT ["/usr/local/bin/vault-bootstrap", "--"]
-CMD ["node", "server.js"]
+ENTRYPOINT ["/usr/local/bin/keevault"]

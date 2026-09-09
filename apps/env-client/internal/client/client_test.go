@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/client"
-	"github.com/ramaadi/env-vault/apps/env-client/internal/protocol"
+	"github.com/ramaadi/keevault/apps/env-client/internal/client"
+	"github.com/ramaadi/keevault/apps/env-client/internal/protocol"
 )
 
 // execRecorder captures what the client would have exec'd.

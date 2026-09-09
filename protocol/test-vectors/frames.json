@@ -1,5 +1,5 @@
 {
-  "description": "Text frames for the env-vault bootstrap protocol v1. Each vector holds the exact frame text, the direction it travels, and whether a conforming parser must accept it. Invalid vectors name the reason they must be rejected. The bootstrap token is sent in the Authorization header, so it is not a frame and has no vector here.",
+  "description": "Text frames for the keevault bootstrap protocol v1. Each vector holds the exact frame text, the direction it travels, and whether a conforming parser must accept it. Invalid vectors name the reason they must be rejected. The bootstrap token is sent in the Authorization header, so it is not a frame and has no vector here.",
   "vectors": [
     {
       "name": "boot.hello with git, oci and provider claims plus one signed build manifest",

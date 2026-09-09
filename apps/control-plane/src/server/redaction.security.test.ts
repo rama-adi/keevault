@@ -12,9 +12,9 @@ import {
   signResume,
   x25519PublicKeyFromPrivate,
   type Bytes,
-} from "@env-vault/crypto";
-import { parseServerFrame, type ServerMessage } from "@env-vault/protocol";
-import type { VaultDatabase } from "@env-vault/vault-store";
+} from "@keevault/crypto";
+import { parseServerFrame, type ServerMessage } from "@keevault/protocol";
+import type { VaultDatabase } from "@keevault/vault-store";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
 import { z } from "zod";
 

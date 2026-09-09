@@ -1,13 +1,13 @@
 # Zeabur integration test matrix
 
 This is the checklist an operator runs against a real Zeabur project before
-calling env-vault V1 production-ready. It combines the readiness
+calling keevault V1 production-ready. It combines the readiness
 consideration in product-specs.md section 33 with the Phase 10 test list in
 section 43. Every row starts "not yet run" and stays that way until someone
 actually runs it against Zeabur and records the result here.
 
 None of these can be run from this repository alone: they need a Zeabur
-account, a deployed env-vault control plane, and the example image in
+account, a deployed keevault control plane, and the example image in
 `examples/zeabur-node-app`.
 
 ## Deployment mode tests
@@ -33,13 +33,13 @@ account, a deployed env-vault control plane, and the example image in
 
 ## Connection and lifecycle tests
 
-| #   | Test                                                                                                                                                                                             | Status      | Notes                                                   |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------- |
-| 12  | WebSocket disconnect while pending: bootstrap client reconnects and resumes without losing the pending boot                                                                                      | not yet run |                                                         |
-| 13  | WebSocket disconnect immediately after approval, before boot.received is sent: client reconnects, resumes, and receives the identical boot.approved frame again                                  | not yet run |                                                         |
-| 14  | Redeploy the service while a boot is pending: confirm the old boot is canceled or expires cleanly and the new deployment starts its own boot                                                     | not yet run |                                                         |
-| 15  | Restart the service after a successful boot: confirm a fresh boot is created and requires a fresh approval, since the previous boot's keys are gone                                              | not yet run |                                                         |
-| 16  | Health check behavior end to end: Zeabur's own health check against `/healthz` fails (or times out) for the whole pending window and only starts passing once vault-bootstrap execs into the app | not yet run | the health check must never be faked into passing early |
+| #   | Test                                                                                                                                                                                      | Status      | Notes                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------- |
+| 12  | WebSocket disconnect while pending: bootstrap client reconnects and resumes without losing the pending boot                                                                               | not yet run |                                                         |
+| 13  | WebSocket disconnect immediately after approval, before boot.received is sent: client reconnects, resumes, and receives the identical boot.approved frame again                           | not yet run |                                                         |
+| 14  | Redeploy the service while a boot is pending: confirm the old boot is canceled or expires cleanly and the new deployment starts its own boot                                              | not yet run |                                                         |
+| 15  | Restart the service after a successful boot: confirm a fresh boot is created and requires a fresh approval, since the previous boot's keys are gone                                       | not yet run |                                                         |
+| 16  | Health check behavior end to end: Zeabur's own health check against `/healthz` fails (or times out) for the whole pending window and only starts passing once keevault execs into the app | not yet run | the health check must never be faked into passing early |
 
 ## What to record for each row
 

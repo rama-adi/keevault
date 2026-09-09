@@ -1,4 +1,4 @@
-import { sha256HexOfText } from "@env-vault/crypto";
+import { sha256HexOfText } from "@keevault/crypto";
 import { z } from "zod";
 
 import { VERIFICATION_STATUSES } from "./types.ts";

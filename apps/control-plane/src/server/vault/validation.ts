@@ -5,7 +5,7 @@
  * ULIDs, base64url key material and CIDR strings.
  */
 
-import { parseCidr, isPrefixedUlid, type UlidPrefix } from "@env-vault/crypto";
+import { parseCidr, isPrefixedUlid, type UlidPrefix } from "@keevault/crypto";
 import { z } from "zod";
 
 /** Thrown when caller input is well formed JSON but not acceptable to the vault. */

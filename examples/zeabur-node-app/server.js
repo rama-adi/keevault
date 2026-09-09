@@ -1,9 +1,9 @@
-// Tiny demo app for the env-vault Zeabur example. No dependencies.
+// Tiny demo app for the keevault Zeabur example. No dependencies.
 //
 // GET /healthz responds 200 "ok" once the process is up. This is a process
 // liveness check, not proof that the vault has delivered secrets: the
 // container is not considered ready by the deployment until an administrator
-// approves the boot, and vault-bootstrap does not start this process at all
+// approves the boot, and keevault does not start this process at all
 // until that happens. See docs/zeabur.md and spec section 33.
 //
 // GET / responds with JSON listing the NAMES (never values) of every

@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "env-vault",
+  "name": "keevault",
   "compatibility_date": "2026-09-05",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server/worker.ts",
@@ -19,13 +19,13 @@
   "d1_databases": [
     {
       "binding": "VAULT_DB",
-      "database_name": "env-vault-vault",
+      "database_name": "keevault-vault",
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "../../migrations/vault",
     },
     {
       "binding": "AUTH_DB",
-      "database_name": "env-vault-auth",
+      "database_name": "keevault-auth",
       "database_id": "00000000-0000-0000-0000-000000000001",
       "migrations_dir": "../../migrations/auth",
     },

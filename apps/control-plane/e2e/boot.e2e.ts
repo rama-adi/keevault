@@ -627,8 +627,8 @@ async function main(): Promise<number> {
   );
 
   say("Building the Go client");
-  const workspace = await mkdtemp(join(tmpdir(), "env-vault-e2e-"));
-  const binary = join(workspace, "vault-bootstrap");
+  const workspace = await mkdtemp(join(tmpdir(), "keevault-e2e-"));
+  const binary = join(workspace, "keevault");
   await mustRun("go", ["build", "-o", binary, "."], GO_CLIENT_DIRECTORY, "go build");
 
   say("Starting the dev server with VAULT_E2E=1");

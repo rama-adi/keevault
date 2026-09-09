@@ -5,8 +5,8 @@ import {
   keyFingerprint,
   signManifest,
   signedBuildManifestNode,
-} from "@env-vault/crypto";
-import type { SignedBuildManifestEvidence, WorkloadClaims } from "@env-vault/protocol";
+} from "@keevault/crypto";
+import type { SignedBuildManifestEvidence, WorkloadClaims } from "@keevault/protocol";
 import { describe, expect, it } from "vite-plus/test";
 
 import { claimsOnlyVerifier } from "./claims-only.ts";

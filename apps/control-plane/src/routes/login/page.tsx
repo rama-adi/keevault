@@ -33,7 +33,7 @@ function LoginPage() {
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
           <CardDescription>
-            env-vault accepts passkeys only. There is no password to fall back on.
+            keevault accepts passkeys only. There is no password to fall back on.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

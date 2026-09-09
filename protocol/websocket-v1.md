@@ -1,4 +1,4 @@
-# env-vault bootstrap WebSocket protocol v1
+# keevault bootstrap WebSocket protocol v1
 
 This document is normative. It defines every frame exchanged on `/bootstrap/v1`, the states a boot request moves through, and when each side closes the socket. Implementations in TypeScript (`packages/protocol`) and Go (`apps/env-client/internal/protocol`) must agree byte for byte with what is written here.
 

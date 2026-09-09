@@ -22,7 +22,7 @@ import {
   wrapEnvironmentKey,
   wrapProjectKey,
   type Bytes,
-} from "@env-vault/crypto";
+} from "@keevault/crypto";
 import {
   buildReencryptSecretStatement,
   buildRetireProjectKeyStatement,
@@ -36,7 +36,7 @@ import {
   listSecretsForDelivery,
   type EnvironmentKeyRow,
   type VaultPreparedStatement,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 
 import { writeAuditEvent, type AuditMetadataValue } from "./audit.ts";
 import type { VaultContext } from "./context.ts";

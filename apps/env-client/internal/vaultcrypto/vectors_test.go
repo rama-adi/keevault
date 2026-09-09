@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	vc "github.com/ramaadi/env-vault/apps/env-client/internal/vaultcrypto"
+	vc "github.com/ramaadi/keevault/apps/env-client/internal/vaultcrypto"
 )
 
 // The shared vectors live at crypto/test-vectors in the repository root. The

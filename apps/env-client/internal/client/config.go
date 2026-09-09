@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/protocol"
-	"github.com/ramaadi/env-vault/apps/env-client/internal/run"
+	"github.com/ramaadi/keevault/apps/env-client/internal/protocol"
+	"github.com/ramaadi/keevault/apps/env-client/internal/run"
 )
 
 // Process exit codes. Zero never happens because a successful boot replaces
@@ -55,6 +55,10 @@ func ExitCode(err error) int {
 type Config struct {
 	// URL is the vault endpoint. https, http, wss and ws are accepted.
 	URL string
+	// EnvironmentID pins the environment authorized by the bootstrap token.
+	EnvironmentID string
+	// RequiredSecrets must all be delivered before acknowledging approval.
+	RequiredSecrets []string
 	// Token is the bootstrap token sent as a bearer credential.
 	Token string
 	// Claims is the untrusted provenance claim block.

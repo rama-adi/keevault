@@ -11,7 +11,7 @@ import type {
   ProjectRow,
   SecretMetadataRow,
   TrustedSignerRow,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 import { z } from "zod";
 
 export interface ProjectSummary {

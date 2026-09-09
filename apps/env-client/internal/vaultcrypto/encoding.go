@@ -1,4 +1,4 @@
-// Package vaultcrypto implements the env-vault key hierarchy, envelopes,
+// Package vaultcrypto implements the keevault key hierarchy, envelopes,
 // tokens and canonical strings for the Go bootstrap client. Every encoding
 // here must match the TypeScript implementation byte for byte.
 package vaultcrypto

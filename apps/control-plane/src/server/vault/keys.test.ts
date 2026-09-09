@@ -1,4 +1,4 @@
-import { b64uEncode, generateKey32 } from "@env-vault/crypto";
+import { b64uEncode, generateKey32 } from "@keevault/crypto";
 import { describe, expect, test } from "vite-plus/test";
 
 import { loadMasterKeys, VaultKeyError, type MasterKeyEnv } from "./keys.ts";

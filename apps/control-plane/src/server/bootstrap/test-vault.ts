@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
-import { fromNodeSqlite, runMigrations } from "@env-vault/vault-store";
-import type { VaultDatabase } from "@env-vault/vault-store";
+import { fromNodeSqlite, runMigrations } from "@keevault/vault-store";
+import type { VaultDatabase } from "@keevault/vault-store";
 
 /**
  * An in-memory vault database with the real migration applied.

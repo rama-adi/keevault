@@ -11,8 +11,8 @@ import {
   signResume,
   x25519PublicKeyFromPrivate,
   type Bytes,
-} from "@env-vault/crypto";
-import { parseServerFrame, type ServerMessage } from "@env-vault/protocol";
+} from "@keevault/crypto";
+import { parseServerFrame, type ServerMessage } from "@keevault/protocol";
 import {
   createBootstrapToken,
   createEnvironment,
@@ -21,7 +21,7 @@ import {
   revokeBootstrapToken,
   upsertSecretReplace,
   type VaultDatabase,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { createTestVault } from "../bootstrap/test-vault.ts";
@@ -159,6 +159,7 @@ async function createHarness(): Promise<Harness> {
     });
   }
   await upsertSecretReplace(vault.db, {
+    expectedVersion: 0,
     id: generatePrefixedUlid("sec"),
     environmentId,
     name: "DATABASE_URL",

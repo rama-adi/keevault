@@ -6,13 +6,13 @@
  * function here logs or audits either half of the token.
  */
 
-import { generateBootstrapToken, parseCidr } from "@env-vault/crypto";
+import { generateBootstrapToken, parseCidr } from "@keevault/crypto";
 import {
   createBootstrapToken as createBootstrapTokenRow,
   listBootstrapTokensByEnvironment,
   revokeBootstrapToken as revokeBootstrapTokenRow,
   updateBootstrapTokenCidrs,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 import { z } from "zod";
 
 import { log } from "../log.ts";

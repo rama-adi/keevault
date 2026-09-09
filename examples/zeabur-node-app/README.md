@@ -1,28 +1,41 @@
 # Zeabur Node app example
 
 This is a minimal, dependency-free Node app that shows how to run a workload
-behind env-vault's bootstrap client on Zeabur. `server.js` listens on `PORT`,
+behind keevault's bootstrap client on Zeabur. `server.js` listens on `PORT`,
 answers `GET /healthz` with `200 ok`, and answers `GET /` with a JSON object
 listing the names (never the values) of every environment variable starting
 with `APP_`, plus the process uptime.
 
-The Dockerfile builds `vault-bootstrap` from `apps/env-client` in a Go build
-stage, then copies the static binary into a Node 22 runtime image. The
-container's entrypoint is `vault-bootstrap`, not `node`: the app only starts
-once a human approves the boot on the env-vault dashboard and the bootstrap
-client has decrypted the environment.
+The Dockerfile downloads a released static `keevault` binary from R2 and verifies
+its SHA-256 against the build argument you supply. It contains no Go build stage.
+The entrypoint reads `keevault.json` and launches `node server.js` after approval.
 
 ## Building
 
-Build from the repository root so the build stage can see `apps/env-client`:
+Publish a release using `docs/releases.md`, then copy its trusted checksums into
+your build configuration. Replace these placeholders before running:
 
 ```bash
-docker build -f examples/zeabur-node-app/Dockerfile -t zeabur-node-app-example .
+docker build -f examples/zeabur-node-app/Dockerfile \
+  --build-arg KEEVAULT_RELEASE_URL=https://downloads.example.com \
+  --build-arg KEEVAULT_VERSION=v1.0.0 \
+  --build-arg KEEVAULT_SHA256_AMD64='REPLACE_WITH_AMD64_SHA256' \
+  --build-arg KEEVAULT_SHA256_ARM64='REPLACE_WITH_ARM64_SHA256' \
+  -t zeabur-node-app-example .
 ```
+
+Only the checksum
+for the target architecture is required. For a multi-platform build, supply both
+and use `docker buildx build --platform linux/amd64,linux/arm64`.
+
+The example config defines the command. Add `environmentId` to pin the intended
+environment and `requiredSecrets` to fail before launch if a needed secret is
+missing. The bootstrap token determines which environment the server releases.
+Keep the token in runtime environment variables, never in `keevault.json`.
 
 ## Running locally against a vault dev server
 
-Point the container at a running env-vault control plane and a bootstrap
+Point the container at a running keevault control plane and a bootstrap
 token for one environment:
 
 ```bash
@@ -43,7 +56,7 @@ arguments and not in the image:
 
 | Variable                | Required | Meaning                                                      |
 | ----------------------- | -------- | ------------------------------------------------------------ |
-| `VAULT_URL`             | yes      | The env-vault control plane endpoint.                        |
+| `VAULT_URL`             | yes      | The keevault control plane endpoint.                         |
 | `VAULT_BOOTSTRAP_TOKEN` | yes      | The bootstrap token for this environment.                    |
 | `VAULT_GIT_REPOSITORY`  | no       | Git repository claim. Zeabur exposes this as build metadata. |
 | `VAULT_GIT_COMMIT`      | no       | Git commit claim. Zeabur exposes this as build metadata.     |
@@ -79,7 +92,7 @@ check and rolling-deployment behavior keeps the previous healthy deployment
 running until the replacement passes its health check, so the container must
 never fake readiness to keep a deployment alive. This image does not: node
 does not start, and therefore `/healthz` does not answer, until
-vault-bootstrap execs into it after a successful, decrypted approval.
+keevault execs into it after a successful, decrypted approval.
 
 Before calling this integration production-ready, run the test matrix in
 `docs/zeabur.md`, including how long Zeabur will wait for a deployment stuck

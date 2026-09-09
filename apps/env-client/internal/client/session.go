@@ -14,9 +14,9 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/protocol"
-	"github.com/ramaadi/env-vault/apps/env-client/internal/run"
-	"github.com/ramaadi/env-vault/apps/env-client/internal/vaultcrypto"
+	"github.com/ramaadi/keevault/apps/env-client/internal/protocol"
+	"github.com/ramaadi/keevault/apps/env-client/internal/run"
+	"github.com/ramaadi/keevault/apps/env-client/internal/vaultcrypto"
 )
 
 // maxFrameBytes is the protocol's frame limit, which the server enforces on
@@ -67,7 +67,7 @@ func New(cfg Config) (*Session, error) {
 		return nil, exitf(ExitConfig, "logger is required")
 	}
 	if len(cfg.Command) == 0 {
-		return nil, exitf(ExitConfig, "no command given, use: vault-bootstrap [flags] -- <command> [args...]")
+		return nil, exitf(ExitConfig, "no command given, use: keevault [flags] -- <command> [args...]")
 	}
 	if _, err := vaultcrypto.ParseBootstrapToken(cfg.Token); err != nil {
 		return nil, exitf(ExitConfig, "VAULT_BOOTSTRAP_TOKEN: %v", err)

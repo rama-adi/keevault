@@ -10,16 +10,16 @@ The vault uses two separate D1 databases: one for vault data, one for Better Aut
 
 ```bash
 cd apps/control-plane
-wrangler d1 create env-vault-vault
-wrangler d1 create env-vault-auth
+wrangler d1 create keevault-vault
+wrangler d1 create keevault-auth
 ```
 
 Each command prints a `database_id`. Put both into `wrangler.jsonc`, replacing the placeholder UUIDs:
 
 ```jsonc
 "d1_databases": [
-  { "binding": "VAULT_DB", "database_name": "env-vault-vault", "database_id": "<id from the first command>", "migrations_dir": "../../migrations/vault" },
-  { "binding": "AUTH_DB", "database_name": "env-vault-auth", "database_id": "<id from the second command>", "migrations_dir": "../../migrations/auth" }
+  { "binding": "VAULT_DB", "database_name": "keevault-vault", "database_id": "<id from the first command>", "migrations_dir": "../../migrations/vault" },
+  { "binding": "AUTH_DB", "database_name": "keevault-auth", "database_id": "<id from the second command>", "migrations_dir": "../../migrations/auth" }
 ]
 ```
 
@@ -185,3 +185,16 @@ Any other close code is a transport failure. Both sides are expected to reconnec
 - If `/setup` returns 404 unexpectedly, an owner already exists. Confirm with `wrangler d1 execute AUTH_DB --remote --command "select count(*) from user"`.
 - If passkey sign-in fails after moving `BETTER_AUTH_URL` to a new hostname, existing passkeys were registered against the old relying party id and will not validate against the new one; affected users need to register a new passkey.
 - If a boot never reaches `PENDING`, confirm the Worker can read `VAULT_MASTER_KEY_V<n>` and that the active version in `VAULT_MASTER_KEY_ACTIVE_VERSION` matches a secret that actually exists.
+
+## Upgrading from env-vault
+
+The product, client binary, and workspace package scope are now `keevault`.
+Existing `VAULT_*` variables, bootstrap tokens, encryption formats, and internal
+`x-env-vault-*` headers remain compatible.
+
+The checked-in Wrangler names now use `keevault` for new deployments. For an
+existing deployment, retain its Worker name and D1 database names and IDs in your
+local deployment configuration. Changing the Worker name creates a separate
+Worker and Durable Object namespace; it does not migrate existing boot state or
+Worker secrets. Keep the existing authentication origin so registered passkeys
+continue to use the same relying party ID.

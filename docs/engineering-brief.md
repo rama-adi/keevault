@@ -1,4 +1,4 @@
-# env-vault V1 engineering brief (read fully before touching code)
+# keevault V1 engineering brief (read fully before touching code)
 
 ## Status
 
@@ -19,7 +19,7 @@ Implemented and covered by tests:
 
 Implemented but not exercised against a live external system:
 
-- Phase 10, Zeabur integration: `examples/zeabur-node-app` and its Dockerfile exist and build `vault-bootstrap` as the container entrypoint. The integration test matrix in `docs/zeabur.md` (native Git build, prebuilt OCI, readiness timing, reconnect under a real Zeabur deployment) has not been run against Zeabur; every row is unrun.
+- Phase 10, Zeabur integration: `examples/zeabur-node-app` and its Dockerfile download a pinned precompiled `keevault` binary as the container entrypoint. The integration test matrix in `docs/zeabur.md` (native Git build, prebuilt OCI, readiness timing, reconnect under a real Zeabur deployment) has not been run against Zeabur; every row is unrun.
 
 Partially covered:
 
@@ -60,10 +60,10 @@ apps/control-plane/          Cloudflare Worker: TanStack Start dashboard + Bette
   src/components/vault/      product components built on top of ui/
   src/server/                server-only code: worker entry, DO, auth, vault service, bootstrap WS handler, provenance
   wrangler.jsonc
-packages/protocol/           @env-vault/protocol: zod schemas + TS types for every WS message, state machine, constants, canonical string builders
-packages/crypto/             @env-vault/crypto: Web Crypto implementation of the hierarchy, envelopes, tokens, fingerprints, CIDR matching
-packages/vault-store/        @env-vault/vault-store: D1 schema access layer (typed SQL over a minimal D1-shaped interface), tested against node:sqlite
-apps/env-client/             Go module `github.com/ramaadi/env-vault/apps/env-client` (go.mod lives here; binary is still named vault-bootstrap). main.go + internal/{vaultcrypto,protocol,client,run}
+packages/protocol/           @keevault/protocol: zod schemas + TS types for every WS message, state machine, constants, canonical string builders
+packages/crypto/             @keevault/crypto: Web Crypto implementation of the hierarchy, envelopes, tokens, fingerprints, CIDR matching
+packages/vault-store/        @keevault/vault-store: D1 schema access layer (typed SQL over a minimal D1-shaped interface), tested against node:sqlite
+apps/env-client/             Go module `github.com/ramaadi/keevault/apps/env-client` (go.mod lives here; binary is named keevault). main.go + internal/{vaultcrypto,protocol,client,run}
 migrations/vault/            D1 vault DB migrations (0001_init.sql ...)
 migrations/auth/             D1 auth DB migrations (Better Auth generated)
 protocol/                    websocket-v1.md, messages.schema.json (generated from zod), test-vectors/
@@ -72,7 +72,7 @@ examples/zeabur-node-app/    Dockerfile + tiny Node app for Phase 10
 docs/                        product-specs.md (given), plus threat-model.md, key-rotation.md, incident-response.md, provenance.md, architecture.md, operations.md, README index
 ```
 
-Workspace globs in pnpm-workspace.yaml: apps/_, packages/_, tools/*. Package names are scoped `@env-vault/<name>`. Internal deps use `"workspace:*"`. Add third-party versions to the pnpm catalog when several packages share them.
+Workspace globs in pnpm-workspace.yaml: apps/_, packages/_, tools/*. Package names are scoped `@keevault/<name>`. Internal deps use `"workspace:*"`. Add third-party versions to the pnpm catalog when several packages share them.
 
 Current versions seen on npm today (pin these unless broken): @tanstack/react-start 1.168.49, @tanstack/react-router 1.170.32, @cloudflare/vite-plugin 1.54.4, wrangler 4.129.0, @cloudflare/workers-types 5.20260905.1, better-auth 1.7.2, zod 4.5.4, react 19.2.8, @vitejs/plugin-react 6.1.1, tailwindcss 4.3.3, @tailwindcss/vite 4.3.3, kysely 0.29.5.
 
@@ -229,4 +229,4 @@ Verifier statuses: VERIFIED, UNVERIFIED, FAILED, UNAVAILABLE (spec §25). No sco
 - Master key access contract (owned by the vault service work package, imported by the DO work package): `apps/control-plane/src/server/vault/keys.ts` exports
   `loadMasterKeys(env: Env): MasterKeyring` (reads every `VAULT_MASTER_KEY_V<n>` secret present plus `VAULT_MASTER_KEY_ACTIVE_VERSION`),
   `unwrapEnvironmentDek(db: VaultDatabase, keyring: MasterKeyring, environmentId: string): Promise<{ projectId: string; dek: Bytes; version: number }>` (unwraps master -> project -> environment for the current versions; throws a typed `VaultKeyError` when a wrapped key fails to authenticate).
-- Go client lives at apps/env-client (module `github.com/ramaadi/env-vault/apps/env-client`); the binary is still `vault-bootstrap`.
+- Go client lives at apps/env-client (module `github.com/ramaadi/keevault/apps/env-client`); the binary is `keevault`.

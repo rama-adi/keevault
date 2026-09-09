@@ -1,10 +1,10 @@
-import { generateBootstrapToken, generatePrefixedUlid } from "@env-vault/crypto";
+import { generateBootstrapToken, generatePrefixedUlid } from "@keevault/crypto";
 import {
   createBootstrapToken,
   createEnvironment,
   createProject,
   type VaultDatabase,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import {

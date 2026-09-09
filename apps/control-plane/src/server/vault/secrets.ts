@@ -6,13 +6,13 @@
  * path anywhere in the service, and no function here logs or audits a value.
  */
 
-import { b64uEncode, encryptSecret, utf8Encode } from "@env-vault/crypto";
+import { b64uEncode, encryptSecret, utf8Encode } from "@keevault/crypto";
 import {
   deleteSecret as deleteSecretRow,
   getSecretForDelivery,
   listSecretMetadata,
   upsertSecretReplace,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 
 import { writeAuditEvent, type AuditMetadataValue } from "./audit.ts";
 import type { VaultContext } from "./context.ts";
@@ -128,6 +128,7 @@ async function writeSecret(
 
   const row = await upsertSecretReplace(context.db, {
     id: secretId,
+    expectedVersion: existing?.secretVersion ?? 0,
     environmentId: input.environment.id,
     name: input.name,
     ciphertext: b64uEncode(sealed.ciphertext),
@@ -183,8 +184,9 @@ export interface ImportDotenvResult {
 /**
  * Parse and store a pasted .env file.
  *
- * Any unusable line rejects the whole import, so an operator never ends up with
- * a half-applied file. The error names the offending variable names, which are
+ * Parsing and value validation finish before any writes. A database error or
+ * concurrent write can still leave a partially applied import. The error names
+ * the offending variable names, which are
  * already shown in the dashboard, and never a value.
  */
 export async function importDotenv(

@@ -1,9 +1,9 @@
-// Command vault-bootstrap fetches an approved environment from the vault and
+// Command keevault fetches an approved environment from the vault and
 // replaces itself with the target command.
 //
 // Usage:
 //
-//	vault-bootstrap [flags] -- <command> [args...]
+//	keevault [flags] -- <command> [args...]
 package main
 
 import (
@@ -19,8 +19,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/client"
-	"github.com/ramaadi/env-vault/apps/env-client/internal/protocol"
+	"github.com/ramaadi/keevault/apps/env-client/internal/client"
+	"github.com/ramaadi/keevault/apps/env-client/internal/protocol"
 )
 
 func main() {
@@ -31,26 +31,26 @@ func main() {
 func runMain(args []string, stderr io.Writer) int {
 	settings, command, err := parseArgs(args, stderr)
 	if err != nil {
-		fmt.Fprintf(stderr, "vault-bootstrap: %v\n", err)
+		fmt.Fprintf(stderr, "keevault: %v\n", err)
 		return client.ExitCode(err)
 	}
 
 	level, err := client.ParseLevel(settings.logLevel)
 	if err != nil {
-		fmt.Fprintf(stderr, "vault-bootstrap: %v\n", err)
+		fmt.Fprintf(stderr, "keevault: %v\n", err)
 		return client.ExitConfig
 	}
 	logger := client.NewLogger(stderr, level)
 
 	cfg, err := settings.config(command, logger)
 	if err != nil {
-		fmt.Fprintf(stderr, "vault-bootstrap: %v\n", err)
+		fmt.Fprintf(stderr, "keevault: %v\n", err)
 		return client.ExitCode(err)
 	}
 
 	session, err := client.New(cfg)
 	if err != nil {
-		fmt.Fprintf(stderr, "vault-bootstrap: %v\n", err)
+		fmt.Fprintf(stderr, "keevault: %v\n", err)
 		return client.ExitCode(err)
 	}
 
@@ -58,38 +58,44 @@ func runMain(args []string, stderr io.Writer) int {
 	defer stop()
 
 	if err := session.Run(ctx); err != nil {
-		fmt.Fprintf(stderr, "vault-bootstrap: %v\n", err)
+		fmt.Fprintf(stderr, "keevault: %v\n", err)
 		return client.ExitCode(err)
 	}
 	return client.ExitProtocol
 }
 
 type settings struct {
-	url            string
-	token          string
-	gitRepository  string
-	gitCommit      string
-	ociRepository  string
-	ociDigest      string
-	deploymentID   string
-	provider       string
-	evidenceFile   string
-	pendingTimeout string
-	logLevel       string
+	url             string
+	token           string
+	gitRepository   string
+	gitCommit       string
+	ociRepository   string
+	ociDigest       string
+	deploymentID    string
+	provider        string
+	evidenceFile    string
+	pendingTimeout  string
+	logLevel        string
+	environmentID   string
+	requiredSecrets []string
 }
 
 func env(name string) string { return strings.TrimSpace(os.Getenv(name)) }
 
 func parseArgs(args []string, stderr io.Writer) (settings, []string, error) {
 	var s settings
-	fs := flag.NewFlagSet("vault-bootstrap", flag.ContinueOnError)
+	var configPath string
+	fs := flag.NewFlagSet("keevault", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
 		fmt.Fprint(stderr, usage)
 		fs.PrintDefaults()
 	}
+	fs.StringVar(&configPath, "config", env("KEEVAULT_CONFIG"), "configuration file, defaults to ./keevault.json when present")
+	fs.StringVar(&s.environmentID, "environment-id", env("KEEVAULT_ENVIRONMENT_ID"), "expected environment ID")
 	fs.StringVar(&s.url, "vault-url", env("VAULT_URL"), "vault endpoint, https or wss")
-	fs.StringVar(&s.token, "vault-bootstrap-token", env("VAULT_BOOTSTRAP_TOKEN"), "bootstrap token")
+	fs.StringVar(&s.token, "vault-bootstrap-token", env("VAULT_BOOTSTRAP_TOKEN"), "bootstrap token (VAULT_BOOTSTRAP_TOKEN)")
+	fs.StringVar(&s.token, "keevault-token", env("VAULT_BOOTSTRAP_TOKEN"), "bootstrap token alias")
 	fs.StringVar(&s.gitRepository, "vault-git-repository", env("VAULT_GIT_REPOSITORY"), "git repository claim")
 	fs.StringVar(&s.gitCommit, "vault-git-commit", env("VAULT_GIT_COMMIT"), "git commit claim")
 	fs.StringVar(&s.ociRepository, "vault-oci-repository", env("VAULT_OCI_REPOSITORY"), "container image repository claim")
@@ -106,25 +112,44 @@ func parseArgs(args []string, stderr io.Writer) (settings, []string, error) {
 		}
 		return settings{}, nil, &client.ExitError{Code: client.ExitConfig, Err: err}
 	}
+	file, err := loadProjectConfig(configPath)
+	if err != nil {
+		return settings{}, nil, &client.ExitError{Code: client.ExitConfig, Err: err}
+	}
+	setFlags := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { setFlags[f.Name] = true })
+	if s.url == "" && !setFlags["vault-url"] {
+		s.url = file.VaultURL
+	}
+	if s.environmentID == "" && !setFlags["environment-id"] {
+		s.environmentID = file.EnvironmentID
+	}
+	s.requiredSecrets = file.RequiredSecrets
 	command := fs.Args()
+	if len(command) == 0 {
+		command = file.Command
+	}
 	if len(command) == 0 {
 		fs.Usage()
 		return settings{}, nil, &client.ExitError{
 			Code: client.ExitConfig,
-			Err:  errors.New("no command given, use: vault-bootstrap [flags] -- <command> [args...]"),
+			Err:  errors.New("no command given, use: keevault [flags] -- <command> [args...]"),
 		}
 	}
 	return s, command, nil
 }
 
-const usage = `vault-bootstrap fetches an approved environment from the vault and then
+const usage = `keevault fetches an approved environment from the vault and then
 replaces itself with the target command.
 
 Usage:
-  vault-bootstrap [flags] -- <command> [args...]
+  keevault [flags] -- <command> [args...]
 
-Every flag has an environment variable of the same name in upper snake case,
-for example --vault-url and VAULT_URL. The flag wins when both are set.
+Optional ./keevault.json defines vaultUrl, environmentId, requiredSecrets and
+command. Flags override environment variables, which override the file.
+Legacy --vault-* flags use VAULT_* variables. --config uses KEEVAULT_CONFIG
+and --environment-id uses KEEVAULT_ENVIRONMENT_ID. Commands are argv arrays;
+no shell expansion is performed.
 
 Flags:
 `
@@ -158,13 +183,15 @@ func (s settings) config(command []string, logger *client.Logger) (client.Config
 	}
 
 	return client.Config{
-		URL:            s.url,
-		Token:          s.token,
-		Claims:         claims,
-		Evidence:       evidence,
-		PendingTimeout: timeout,
-		Command:        command,
-		Logger:         logger,
+		URL:             s.url,
+		EnvironmentID:   s.environmentID,
+		RequiredSecrets: s.requiredSecrets,
+		Token:           s.token,
+		Claims:          claims,
+		Evidence:        evidence,
+		PendingTimeout:  timeout,
+		Command:         command,
+		Logger:          logger,
 	}, nil
 }
 

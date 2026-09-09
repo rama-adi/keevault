@@ -5,15 +5,18 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/protocol"
-	"github.com/ramaadi/env-vault/apps/env-client/internal/run"
-	"github.com/ramaadi/env-vault/apps/env-client/internal/vaultcrypto"
+	"github.com/ramaadi/keevault/apps/env-client/internal/protocol"
+	"github.com/ramaadi/keevault/apps/env-client/internal/run"
+	"github.com/ramaadi/keevault/apps/env-client/internal/vaultcrypto"
 )
 
 // handleApproved opens the key envelope, decrypts every secret and
 // acknowledges the payload. frame must be the exact bytes received, because
 // payloadDigest covers them.
 func (s *Session) handleApproved(ctx context.Context, conn *websocket.Conn, frame []byte, m protocol.Approved) error {
+	if s.cfg.EnvironmentID != "" && m.EnvironmentID != s.cfg.EnvironmentID {
+		return exitf(ExitProtocol, "approval does not match the configured environment")
+	}
 	if s.bootID == "" {
 		s.bootID = m.BootID
 	}
@@ -32,6 +35,19 @@ func (s *Session) handleApproved(ctx context.Context, conn *websocket.Conn, fram
 	secrets, err := s.decrypt(m)
 	if err != nil {
 		return err
+	}
+	for _, name := range s.cfg.RequiredSecrets {
+		found := false
+		for _, secret := range secrets {
+			if secret.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			zeroAll(secrets)
+			return exitf(ExitConfig, "approved environment is missing a required secret")
+		}
 	}
 	s.wipeSecrets()
 	s.secrets = secrets

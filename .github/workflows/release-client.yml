@@ -1,0 +1,67 @@
+name: Release keevault client
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+concurrency:
+  group: release-client-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/env-client/go.mod
+          cache-dependency-path: apps/env-client/go.sum
+      - name: Test client
+        working-directory: apps/env-client
+        run: |
+          go vet ./...
+          go test ./...
+      - name: Build static binaries
+        run: bash scripts/build-release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keevault-${{ github.ref_name }}
+          path: |
+            apps/env-client/dist/keevault-linux-*
+            apps/env-client/dist/SHA256SUMS
+          if-no-files-found: error
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: releases
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: keevault-${{ github.ref_name }}
+          path: dist
+      - name: Publish versioned artifacts to R2
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]] || { echo 'Expected a version tag such as v1.0.0'; exit 1; }
+          : "${R2_ACCOUNT_ID:?Configure R2_ACCOUNT_ID}"
+          : "${R2_BUCKET:?Configure R2_BUCKET}"
+          : "${AWS_ACCESS_KEY_ID:?Configure R2_ACCESS_KEY_ID}"
+          : "${AWS_SECRET_ACCESS_KEY:?Configure R2_SECRET_ACCESS_KEY}"
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          prefix="releases/${RELEASE_VERSION}/"
+          existing=$(aws s3api list-objects-v2 --endpoint-url "$endpoint" --bucket "$R2_BUCKET" --prefix "$prefix" --max-keys 1 --query KeyCount --output text)
+          [[ "$existing" == 0 ]] || { echo 'Version already exists; publish a new tag'; exit 1; }
+          cd dist
+          sha256sum --check SHA256SUMS
+          for file in keevault-linux-amd64 keevault-linux-arm64 SHA256SUMS; do
+            aws s3 cp "$file" "s3://${R2_BUCKET}/${prefix}${file}" --endpoint-url "$endpoint" --cache-control 'public,max-age=31536000,immutable' --only-show-errors
+          done

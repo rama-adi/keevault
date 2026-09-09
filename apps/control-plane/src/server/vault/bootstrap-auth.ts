@@ -1,11 +1,11 @@
-import { CLOSE_CODES, type CloseCode } from "@env-vault/protocol";
-import { ipAllowed, parseBootstrapToken, verifyTokenSecret } from "@env-vault/crypto";
+import { CLOSE_CODES, type CloseCode } from "@keevault/protocol";
+import { ipAllowed, parseBootstrapToken, verifyTokenSecret } from "@keevault/crypto";
 import {
   getBootstrapTokenByTokenId,
   getEnvironment,
   touchBootstrapTokenLastSeen,
-} from "@env-vault/vault-store";
-import type { VaultDatabase } from "@env-vault/vault-store";
+} from "@keevault/vault-store";
+import type { VaultDatabase } from "@keevault/vault-store";
 import { z } from "zod";
 
 /**
@@ -84,11 +84,9 @@ function reject(
   return { ok: false, reason, closeCode, httpStatus: httpStatusFor(closeCode), message };
 }
 
-function readAllowedCidrs(allowedCidrsJson: string): string[] {
+function readAllowedCidrs(allowedCidrsJson: string): string[] | null {
   const parsed = jsonText.pipe(allowedCidrsSchema).safeParse(allowedCidrsJson);
-  // A policy we cannot read is not a policy we may ignore, so treat it as a
-  // block list of one address nobody has.
-  return parsed.success ? parsed.data : ["::1/128"];
+  return parsed.success ? parsed.data : null;
 }
 
 /**
@@ -140,7 +138,7 @@ export async function authenticateBootstrapRequest(
 
   const sourceIp = request.headers.get("CF-Connecting-IP") ?? "";
   const allowedCidrs = readAllowedCidrs(token.allowedCidrsJson);
-  if (!ipAllowed(sourceIp, allowedCidrs)) {
+  if (allowedCidrs === null || !ipAllowed(sourceIp, allowedCidrs)) {
     return reject(
       "cidr",
       CLOSE_CODES.FORBIDDEN,

@@ -11,8 +11,8 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/protocol"
-	vc "github.com/ramaadi/env-vault/apps/env-client/internal/vaultcrypto"
+	"github.com/ramaadi/keevault/apps/env-client/internal/protocol"
+	vc "github.com/ramaadi/keevault/apps/env-client/internal/vaultcrypto"
 )
 
 // mode selects how the fake vault behaves after the first hello.

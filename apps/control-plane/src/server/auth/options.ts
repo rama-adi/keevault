@@ -25,7 +25,7 @@ export function buildAuthOptions(
 ): BetterAuthOptions {
   const secureCookies = baseUrl.startsWith("https://");
   return {
-    appName: "env-vault",
+    appName: "keevault",
     baseURL: baseUrl,
     secret,
     database,
@@ -72,7 +72,7 @@ export function buildAuthOptions(
     plugins: [
       passkey({
         rpID: relyingPartyId(baseUrl),
-        rpName: "env-vault",
+        rpName: "keevault",
         origin: baseUrl,
         authenticatorSelection: {
           residentKey: "required",

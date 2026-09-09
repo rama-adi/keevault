@@ -2,7 +2,7 @@
   "name": "zeabur-node-app-example",
   "version": "1.0.0",
   "private": true,
-  "description": "Tiny dependency-free Node app used to demonstrate env-vault bootstrap on Zeabur.",
+  "description": "Tiny dependency-free Node app used to demonstrate keevault bootstrap on Zeabur.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

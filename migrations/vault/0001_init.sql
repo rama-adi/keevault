@@ -1,4 +1,4 @@
--- env-vault D1 vault schema, initial migration (spec section 19).
+-- keevault D1 vault schema, initial migration (spec section 19).
 -- Conventions:
 --   ids            TEXT, prefixed ULID (proj_, env_, sec_, tok_, boot_, aud_, pol_, sig_)
 --   timestamps     TEXT, RFC 3339 UTC with millisecond precision

@@ -1,5 +1,5 @@
-import { b64uDecode, signedBuildManifestNode, verifyManifest } from "@env-vault/crypto";
-import type { Evidence, SignedBuildManifestEvidence } from "@env-vault/protocol";
+import { b64uDecode, signedBuildManifestNode, verifyManifest } from "@keevault/crypto";
+import type { Evidence, SignedBuildManifestEvidence } from "@keevault/protocol";
 
 import type {
   ProvenanceVerifier,

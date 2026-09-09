@@ -6,7 +6,7 @@
  * tests free of the workerd runtime.
  */
 
-import { fromD1 } from "@env-vault/vault-store";
+import { fromD1 } from "@keevault/vault-store";
 import { env } from "cloudflare:workers";
 
 import type { VaultSession } from "../auth/guards.ts";

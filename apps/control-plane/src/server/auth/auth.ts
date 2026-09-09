@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { env } from "cloudflare:workers";
 
 import { buildAuthOptions } from "./options.ts";
+import { sessionStepUpAt } from "./step-up-policy.ts";
 import { vaultSetup } from "./setup-plugin.ts";
 
 /**
@@ -32,12 +33,8 @@ export function createAuth() {
     databaseHooks: {
       session: {
         create: {
-          async before(session) {
-            // A passkey assertion is the only way a session row is ever
-            // created here, so session creation time is the time of the last
-            // passkey verification. Recording it explicitly keeps the step-up
-            // check independent of how Better Auth refreshes `updatedAt`.
-            return { data: { ...session, stepUpAt: new Date() } };
+          async before(session, context) {
+            return { data: { ...session, stepUpAt: sessionStepUpAt(context?.path, new Date()) } };
           },
         },
       },

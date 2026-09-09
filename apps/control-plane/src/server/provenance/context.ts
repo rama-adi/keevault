@@ -3,7 +3,7 @@ import {
   listTrustedSignersForEnvironment,
   type ProvenanceMode,
   type VaultDatabase,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 
 import type { ProvenancePolicyEntry, TrustedSigner } from "./types.ts";
 

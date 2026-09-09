@@ -15,7 +15,7 @@ import { defineConfig } from "vite-plus";
  */
 function externalizeWorkersModules(): Plugin {
   return {
-    name: "env-vault:externalize-cloudflare-modules",
+    name: "keevault:externalize-cloudflare-modules",
     enforce: "pre",
     resolveId(id: string) {
       return id.startsWith("cloudflare:") ? { id, external: true } : null;
@@ -49,7 +49,7 @@ function selectHarnessWorkerEntry(): Plugin | null {
   const normal = fileURLToPath(new URL("./src/server/worker.ts", import.meta.url));
   const harness = fileURLToPath(new URL("./src/server/worker.e2e.ts", import.meta.url));
   return {
-    name: "env-vault:e2e-worker-entry",
+    name: "keevault:e2e-worker-entry",
     enforce: "pre",
     resolveId(id: string, importer: string | undefined) {
       // The harness itself imports the normal worker to delegate every request

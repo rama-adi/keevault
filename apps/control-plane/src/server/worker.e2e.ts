@@ -13,7 +13,7 @@
  * machine that can reach the port.
  */
 
-import { fromD1, getBootRequest } from "@env-vault/vault-store";
+import { fromD1, getBootRequest } from "@keevault/vault-store";
 import { z } from "zod";
 
 import worker from "./worker.ts";

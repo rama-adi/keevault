@@ -55,7 +55,7 @@ TanStack Start route loader (src/routes/**)
 guarded() wrapper (functions/guarded.ts)
   │ requireSession / requireRole / requireRecentPasskey (auth/guards.ts)
   ▼
-vault service (server/vault/service.ts) reads or writes D1 via @env-vault/vault-store
+vault service (server/vault/service.ts) reads or writes D1 via @keevault/vault-store
   ▼
 response rendered by the route component
 ```
@@ -207,10 +207,10 @@ When the dashboard's D1 read disagrees with the Durable Object, the Durable Obje
 
 ```text
 apps/control-plane
-├── depends on @env-vault/crypto
-├── depends on @env-vault/protocol
-└── depends on @env-vault/vault-store
-      └── depends on @env-vault/crypto (indirectly, via shared encoding helpers)
+├── depends on @keevault/crypto
+├── depends on @keevault/protocol
+└── depends on @keevault/vault-store
+      └── depends on @keevault/crypto (indirectly, via shared encoding helpers)
 
 apps/env-client (Go, separate module)
 ├── internal/vaultcrypto  mirrors packages/crypto: AES-GCM, X25519, HKDF, Ed25519, bootstrap token parsing

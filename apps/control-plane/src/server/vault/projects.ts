@@ -7,7 +7,7 @@
  * derived from another key (spec section 7).
  */
 
-import { b64uEncode, generateKey32, wrapEnvironmentKey, wrapProjectKey } from "@env-vault/crypto";
+import { b64uEncode, generateKey32, wrapEnvironmentKey, wrapProjectKey } from "@keevault/crypto";
 import {
   createEnvironment as createEnvironmentRow,
   createProject as createProjectRow,
@@ -26,7 +26,7 @@ import {
   updateEnvironmentPolicy,
   type EnvironmentRow,
   type ProjectRow,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 
 import { log } from "../log.ts";
 import { writeAuditEvent, type AuditMetadataValue } from "./audit.ts";

@@ -253,6 +253,7 @@ describe("secrets", () => {
   test("write, replace with a version bump, and delete", async () => {
     await seedEnvironment();
     const created = await upsertSecretReplace(db, {
+      expectedVersion: 0,
       id: "sec_01K4ABCDEFGHJKMNPQRSTVWXYZ",
       environmentId: ENVIRONMENT_ID,
       name: "DATABASE_URL",
@@ -264,7 +265,8 @@ describe("secrets", () => {
     expect(created.secretVersion).toBe(1);
 
     const replaced = await upsertSecretReplace(db, {
-      id: "sec_IGNORED_ON_CONFLICT",
+      expectedVersion: 1,
+      id: created.id,
       environmentId: ENVIRONMENT_ID,
       name: "DATABASE_URL",
       ciphertext: "Y2lwaGVydGV4dC12Mg",
@@ -287,6 +289,7 @@ describe("secrets", () => {
   test("metadata listing carries no ciphertext", async () => {
     await seedEnvironment();
     await upsertSecretReplace(db, {
+      expectedVersion: 0,
       id: "sec_META",
       environmentId: ENVIRONMENT_ID,
       name: "API_KEY",
@@ -303,6 +306,7 @@ describe("secrets", () => {
   test("the same name cannot exist twice in one environment", async () => {
     await seedEnvironment();
     await upsertSecretReplace(db, {
+      expectedVersion: 0,
       id: "sec_ONE",
       environmentId: ENVIRONMENT_ID,
       name: "API_KEY",
@@ -582,6 +586,7 @@ describe("cascades", () => {
       now: NOW,
     });
     await upsertSecretReplace(db, {
+      expectedVersion: 0,
       id: "sec_ONE",
       environmentId: ENVIRONMENT_ID,
       name: "API_KEY",

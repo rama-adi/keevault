@@ -1,4 +1,4 @@
-module github.com/ramaadi/env-vault/apps/env-client
+module github.com/ramaadi/keevault/apps/env-client
 
 go 1.26
 

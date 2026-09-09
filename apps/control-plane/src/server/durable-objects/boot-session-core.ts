@@ -19,7 +19,7 @@ import {
   keyFingerprint,
   sha256HexOfText,
   verifyResume,
-} from "@env-vault/crypto";
+} from "@keevault/crypto";
 import {
   CLOSE_CODES,
   DEFAULT_CHALLENGE_TTL_SECONDS,
@@ -37,7 +37,7 @@ import {
   type SecretRecord,
   type ServerMessage,
   type WorkloadClaims,
-} from "@env-vault/protocol";
+} from "@keevault/protocol";
 import {
   appendAuditEvent,
   getBootstrapTokenByTokenId,
@@ -47,7 +47,7 @@ import {
   listSecretsForDelivery,
   updateBootRequestStatus,
   type VaultDatabase,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 import { z } from "zod";
 
 import {

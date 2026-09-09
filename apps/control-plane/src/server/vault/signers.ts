@@ -6,12 +6,12 @@
  * bytes. Public keys are not secret, so they may appear in audit metadata.
  */
 
-import { b64uDecode, importEd25519PublicKey, keyFingerprint, KEY_LENGTH } from "@env-vault/crypto";
+import { b64uDecode, importEd25519PublicKey, keyFingerprint, KEY_LENGTH } from "@keevault/crypto";
 import {
   addTrustedSigner as addTrustedSignerRow,
   listTrustedSignersForEnvironment,
   revokeTrustedSigner as revokeTrustedSignerRow,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 
 import { writeAuditEvent, type AuditMetadataValue } from "./audit.ts";
 import type { VaultContext } from "./context.ts";

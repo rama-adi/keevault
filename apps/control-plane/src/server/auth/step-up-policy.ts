@@ -23,3 +23,8 @@ export function isRecentStepUp(stepUpAt: string | null, now: Date, maxAgeSeconds
   if (ageSeconds < -STEP_UP_CLOCK_SKEW_SECONDS) return false;
   return ageSeconds <= maxAgeSeconds;
 }
+
+/** Session creation during setup or registration is not a passkey assertion. */
+export function sessionStepUpAt(path: string | undefined, now: Date): Date | null {
+  return path === "/passkey/verify-authentication" ? now : null;
+}

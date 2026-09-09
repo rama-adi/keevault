@@ -1,4 +1,4 @@
-import type { ProvenanceMode } from "@env-vault/vault-store";
+import type { ProvenanceMode } from "@keevault/vault-store";
 
 import type { PolicyEvaluation, ProvenancePolicyEntry, VerificationResult } from "./types.ts";
 

@@ -1,6 +1,6 @@
-# env-vault
+# keevault
 
-env-vault is a secret vault for container and VPS deployments, built for Zeabur and similar platforms. A Cloudflare Worker holds encrypted secrets in D1 and releases them only after a human approves the specific process that is asking for them. The workload authenticates with a bootstrap token, but the token alone never unlocks anything: it only lets the workload open a pending request that an operator reviews on a dashboard before any plaintext leaves Cloudflare.
+keevault is a secret vault for container and VPS deployments, built for Zeabur and similar platforms. A Cloudflare Worker holds encrypted secrets in D1 and releases them only after a human approves the specific process that is asking for them. The workload authenticates with a bootstrap token, but the token alone never unlocks anything: it only lets the workload open a pending request that an operator reviews on a dashboard before any plaintext leaves Cloudflare.
 
 The release path is deliberately narrow. Each boot generates a fresh Ed25519 signing key and a fresh X25519 encryption key that never leave the process. An operator approves that exact key pair, not a commit or an image tag, so a stolen token can create a pending request but cannot make it approved, and a copied approval payload is useless without the matching private key. Compromising the D1 database, the Docker image, or the platform's own environment-variable storage each falls short of the master key, which lives only as a Cloudflare Worker secret. See `docs/threat-model.md` for the full set of attacker scenarios this design covers and does not cover.
 
@@ -37,18 +37,48 @@ D1 never holds the master key and never holds plaintext secret values. The Durab
 
 ## Repository map
 
-| Path                       | What it is                                                                                                                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/control-plane`       | The Cloudflare Worker: TanStack Start dashboard, Better Auth, the `/bootstrap/v1` WebSocket, `EnvironmentSessionDO`, provenance verifiers.              |
-| `apps/env-client`          | The Go bootstrap client (binary `vault-bootstrap`) that runs inside a workload container and execs the target process after decrypting its environment. |
-| `packages/crypto`          | `@env-vault/crypto`: Web Crypto implementation of the key hierarchy, envelopes, bootstrap tokens, fingerprints, CIDR matching.                          |
-| `packages/protocol`        | `@env-vault/protocol`: zod schemas and TypeScript types for every WebSocket message, the boot state machine, and canonical string builders.             |
-| `packages/vault-store`     | `@env-vault/vault-store`: typed D1 access layer, tested against `node:sqlite`.                                                                          |
-| `migrations`               | D1 schema migrations, split into `vault/` and `auth/`.                                                                                                  |
-| `protocol`                 | `websocket-v1.md`, the generated JSON schema, and shared test vectors.                                                                                  |
-| `crypto/test-vectors`      | Cross-language test vectors the TypeScript and Go crypto tests both load.                                                                               |
-| `examples/zeabur-node-app` | A minimal Node app and Dockerfile showing `vault-bootstrap` as the container entrypoint.                                                                |
-| `docs`                     | Operator and engineering documentation. See `docs/README.md` for the full index.                                                                        |
+| Path                       | What it is                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/control-plane`       | The Cloudflare Worker: TanStack Start dashboard, Better Auth, the `/bootstrap/v1` WebSocket, `EnvironmentSessionDO`, provenance verifiers.       |
+| `apps/env-client`          | The Go bootstrap client (binary `keevault`) that runs inside a workload container and execs the target process after decrypting its environment. |
+| `packages/crypto`          | `@keevault/crypto`: Web Crypto implementation of the key hierarchy, envelopes, bootstrap tokens, fingerprints, CIDR matching.                    |
+| `packages/protocol`        | `@keevault/protocol`: zod schemas and TypeScript types for every WebSocket message, the boot state machine, and canonical string builders.       |
+| `packages/vault-store`     | `@keevault/vault-store`: typed D1 access layer, tested against `node:sqlite`.                                                                    |
+| `migrations`               | D1 schema migrations, split into `vault/` and `auth/`.                                                                                           |
+| `protocol`                 | `websocket-v1.md`, the generated JSON schema, and shared test vectors.                                                                           |
+| `crypto/test-vectors`      | Cross-language test vectors the TypeScript and Go crypto tests both load.                                                                        |
+| `examples/zeabur-node-app` | A minimal Node app and Dockerfile showing `keevault` as the container entrypoint.                                                                |
+| `docs`                     | Operator and engineering documentation. See `docs/README.md` for the full index.                                                                 |
+
+## Run a workload
+
+Create `keevault.json` in your application's working directory:
+
+```json
+{
+  "vaultUrl": "https://vault.example.com",
+  "environmentId": "env_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "requiredSecrets": ["DATABASE_URL", "API_KEY"],
+  "command": ["node", "server.js"]
+}
+```
+
+Set `VAULT_BOOTSTRAP_TOKEN` through your deployment platform, then run `keevault`.
+The client waits for approval, checks the environment ID and required secret names,
+and replaces itself with the configured command. Keep secret values and bootstrap
+tokens out of this file. The token selects the environment; `environmentId` checks
+that the server approved the one you expected. `requiredSecrets` checks presence;
+it does not filter the approved environment's secrets.
+
+Flags override environment variables, which override file settings. A command
+after `--` overrides the configured command. Use `--config path/to/keevault.json`
+for an explicit file. See [client configuration](apps/env-client/README.md).
+
+Container builds download a precompiled Linux binary from R2 and verify a pinned
+SHA-256 checksum. They do not need a Go toolchain. Releases provide `amd64` and
+`arm64` binaries under versioned paths. See [release setup](docs/releases.md) and
+the [example Dockerfile](examples/zeabur-node-app/Dockerfile). R2 publication needs
+your bucket, public download domain, and CI credentials before the first release.
 
 ## Quick start for developers
 
@@ -95,6 +125,8 @@ go test ./...
 ```
 
 ## Further reading
+
+- [Latest code audit](docs/audit-2026-09-09.md) covers fixes and remaining rotation and setup concurrency risks.
 
 - `docs/README.md` is the index into every document below, ordered for a new operator.
 - `docs/architecture.md` covers components, request paths, the key hierarchy, and the boot state machine.

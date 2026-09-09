@@ -13,9 +13,9 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/client"
-	"github.com/ramaadi/env-vault/apps/env-client/internal/protocol"
-	vc "github.com/ramaadi/env-vault/apps/env-client/internal/vaultcrypto"
+	"github.com/ramaadi/keevault/apps/env-client/internal/client"
+	"github.com/ramaadi/keevault/apps/env-client/internal/protocol"
+	vc "github.com/ramaadi/keevault/apps/env-client/internal/vaultcrypto"
 )
 
 // A vault the client trusts for transport but not for content.
@@ -442,5 +442,36 @@ func TestClientRefusesAFrameLargerThanTheProtocolLimit(t *testing.T) {
 	}
 	if recorder.called {
 		t.Error("the client exec'd on a frame larger than the protocol allows")
+	}
+}
+
+func TestConfiguredEnvironmentRequirementsFailBeforeAcknowledgement(t *testing.T) {
+	for _, requirement := range []string{"environment", "secret"} {
+		t.Run(requirement, func(t *testing.T) {
+			vault, server := newHostileVault(t, func(t *testing.T, m *mutable) []byte { return nil })
+			logs := &bytes.Buffer{}
+			recorder := &execRecorder{}
+			cfg := testConfig(t, server.URL, logs, recorder)
+			if requirement == "environment" {
+				cfg.EnvironmentID = "wrong-environment"
+			} else {
+				cfg.RequiredSecrets = []string{"ABSENT_SECRET"}
+			}
+			session, err := client.New(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			if err := session.Run(ctx); err == nil {
+				t.Fatal("requirements must fail")
+			}
+			if recorder.called || vault.acknowledged() {
+				t.Fatal("client acknowledged or launched with unmet requirements")
+			}
+			if strings.Contains(logs.String(), "ABSENT_SECRET") {
+				t.Fatal("secret name leaked to logs")
+			}
+		})
 	}
 }

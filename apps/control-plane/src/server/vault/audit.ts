@@ -6,7 +6,7 @@
  * into the audit log. Record identifiers, fingerprints, versions and counts.
  */
 
-import { appendAuditEvent, type VaultDatabase } from "@env-vault/vault-store";
+import { appendAuditEvent, type VaultDatabase } from "@keevault/vault-store";
 
 import { generatePrefixedUlidId } from "./ids.ts";
 

@@ -1,8 +1,8 @@
 {
-  "name": "@env-vault/vault-store",
+  "name": "@keevault/vault-store",
   "version": "0.0.0",
   "private": true,
-  "description": "Typed D1 data-access layer for the env-vault vault database.",
+  "description": "Typed D1 data-access layer for the keevault vault database.",
   "license": "MIT",
   "files": [
     "dist"

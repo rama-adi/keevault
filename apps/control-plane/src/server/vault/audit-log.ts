@@ -11,7 +11,7 @@ import {
   listAuditEventsByProject,
   type AuditEventRow,
   type VaultDatabase,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 import { z } from "zod";
 
 import type { VaultContext } from "./context.ts";

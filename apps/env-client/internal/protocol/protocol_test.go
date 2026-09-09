@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/protocol"
-	vc "github.com/ramaadi/env-vault/apps/env-client/internal/vaultcrypto"
+	"github.com/ramaadi/keevault/apps/env-client/internal/protocol"
+	vc "github.com/ramaadi/keevault/apps/env-client/internal/vaultcrypto"
 )
 
 func b64u(n int) string { return vc.EncodeB64u(make([]byte, n)) }

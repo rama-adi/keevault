@@ -1,6 +1,6 @@
 # Documentation index
 
-Read these in order if you are operating env-vault for the first time.
+Read these in order if you are operating keevault for the first time.
 
 1. **[architecture.md](./architecture.md)**. Components, request paths, the key hierarchy with exact AAD strings, the boot state machine, and what lives in D1 versus the Durable Object.
 2. **[operations.md](./operations.md)**. The deployment runbook: create the D1 databases, generate secrets, run the first-owner ceremony, then day-two tasks like adding secrets, approving boots, and rotating keys.
@@ -13,5 +13,9 @@ Read these in order if you are operating env-vault for the first time.
 9. **[engineering-brief.md](./engineering-brief.md)**. The byte-level contract between the TypeScript and Go implementations, plus current implementation status.
 
 `security-review-v1.md`, when it exists in this directory, is maintained by a separate review workstream and is not covered by this index.
+
+See [audit-2026-09-09.md](./audit-2026-09-09.md) for the latest review, fixes, and unresolved concurrency findings.
+
+See [releases.md](./releases.md) for publishing precompiled clients to R2 and pinning container downloads.
 
 The normative wire protocol lives outside this directory at `protocol/websocket-v1.md`, alongside the generated JSON schema and test vectors.

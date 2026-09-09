@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	vc "github.com/ramaadi/env-vault/apps/env-client/internal/vaultcrypto"
+	vc "github.com/ramaadi/keevault/apps/env-client/internal/vaultcrypto"
 )
 
 func TestB64uRoundTrip(t *testing.T) {

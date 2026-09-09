@@ -1,5 +1,5 @@
-import { b64uDecode, decryptSecret } from "@env-vault/crypto";
-import { getSecretForDelivery, listEnvironmentKeys } from "@env-vault/vault-store";
+import { b64uDecode, decryptSecret } from "@keevault/crypto";
+import { getSecretForDelivery, listEnvironmentKeys } from "@keevault/vault-store";
 import { describe, expect, test } from "vite-plus/test";
 import { z } from "zod";
 
@@ -153,6 +153,29 @@ describe("secrets", () => {
 
     await deleteSecret(context, { environmentId: production.id, name: "DATABASE_URL" });
     expect(await listSecretsMetadata(context, production.id)).toEqual([]);
+  });
+
+  test("concurrent writes preserve decryptable ciphertext and its version", async () => {
+    const { context } = await createTestContext();
+    const { production } = await seed(context);
+    for (const round of [0, 1]) {
+      const results = await Promise.allSettled([
+        putSecret(context, {
+          environmentId: production.id,
+          name: "API_KEY",
+          value: `first-${round}`,
+        }),
+        putSecret(context, {
+          environmentId: production.id,
+          name: "API_KEY",
+          value: `second-${round}`,
+        }),
+      ]);
+      expect(results.some((result) => result.status === "fulfilled")).toBe(true);
+      expect([`first-${round}`, `second-${round}`]).toContain(
+        await readSecretValue(context, production.id, "API_KEY"),
+      );
+    }
   });
 
   test("a secret name that is not a POSIX environment name is refused", async () => {

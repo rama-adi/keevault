@@ -8,7 +8,7 @@ const document = z
     serverMessage: ServerMessage,
   })
   .meta({
-    title: "env-vault bootstrap protocol v1",
+    title: "keevault bootstrap protocol v1",
     description:
       "Frames exchanged on GET /bootstrap/v1. clientMessage holds every frame a bootstrap client may send, serverMessage every frame the server may send. Generated from packages/protocol; edit the zod schemas, not this file.",
   });

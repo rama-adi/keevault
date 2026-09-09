@@ -6,8 +6,8 @@
  * imports this module.
  */
 
-import { b64uEncode, generateKey32 } from "@env-vault/crypto";
-import type { VaultDatabase } from "@env-vault/vault-store";
+import { b64uEncode, generateKey32 } from "@keevault/crypto";
+import type { VaultDatabase } from "@keevault/vault-store";
 
 import { createTestVault } from "../bootstrap/test-vault.ts";
 import type { AuditActor } from "./audit.ts";

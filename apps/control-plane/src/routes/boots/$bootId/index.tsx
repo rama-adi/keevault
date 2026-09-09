@@ -1,4 +1,4 @@
-import { formatFingerprint } from "@env-vault/crypto";
+import { formatFingerprint } from "@keevault/crypto";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 import { useState, type ReactNode } from "react";

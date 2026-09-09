@@ -7,7 +7,7 @@
  * key and a recording boot control.
  */
 
-import type { VaultDatabase } from "@env-vault/vault-store";
+import type { VaultDatabase } from "@keevault/vault-store";
 
 import type { AuditActor } from "./audit.ts";
 import type { MasterKeyring } from "./keys.ts";

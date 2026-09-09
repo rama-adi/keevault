@@ -1,6 +1,6 @@
-import { generatePrefixedUlid, generateResumeChallenge } from "@env-vault/crypto";
-import { CLOSE_CODES } from "@env-vault/protocol";
-import { fromD1 } from "@env-vault/vault-store";
+import { generatePrefixedUlid, generateResumeChallenge } from "@keevault/crypto";
+import { CLOSE_CODES } from "@keevault/protocol";
+import { fromD1 } from "@keevault/vault-store";
 import { DurableObject } from "cloudflare:workers";
 import { z } from "zod";
 

@@ -41,7 +41,9 @@ const secretDeliveryColumns = `${secretMetadataColumns},
 `;
 
 export interface UpsertSecretInput {
-  /** Used only when the secret name is new in this environment. */
+  /** Zero for creation, otherwise the version used to encrypt the replacement. */
+  expectedVersion: number;
+  /** The row id authenticated by the ciphertext. */
   id: string;
   environmentId: string;
   name: string;
@@ -53,7 +55,8 @@ export interface UpsertSecretInput {
 
 /**
  * Write a secret value. An existing (environment, name) row is replaced in place
- * and its version is incremented; the row id stays stable.
+ * and its version is incremented; the row id stays stable. A stale expected
+ * version or row id rejects the write before ciphertext can lose its AAD binding.
  */
 export async function upsertSecretReplace(
   db: VaultDatabase,
@@ -64,13 +67,17 @@ export async function upsertSecretReplace(
       `INSERT INTO secrets
          (id, environment_id, name, ciphertext, nonce, env_key_version, secret_version,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+       SELECT ?, ?, ?, ?, ?, ?, 1, ?, ?
+       WHERE ? = 0 OR EXISTS (
+         SELECT 1 FROM secrets WHERE id = ? AND secret_version = ?
+       )
        ON CONFLICT (environment_id, name) DO UPDATE SET
          ciphertext = excluded.ciphertext,
          nonce = excluded.nonce,
          env_key_version = excluded.env_key_version,
          secret_version = secrets.secret_version + 1,
          updated_at = excluded.updated_at
+       WHERE secrets.id = excluded.id AND secrets.secret_version = ?
        RETURNING ${secretMetadataColumns}`,
     )
     .bind(
@@ -82,6 +89,10 @@ export async function upsertSecretReplace(
       input.envKeyVersion,
       input.now,
       input.now,
+      input.expectedVersion,
+      input.id,
+      input.expectedVersion,
+      input.expectedVersion,
     );
   return await selectRequired(statement, secretMetadataRowSchema);
 }

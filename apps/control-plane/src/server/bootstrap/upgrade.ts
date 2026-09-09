@@ -1,4 +1,4 @@
-import { fromD1, type VaultDatabase } from "@env-vault/vault-store";
+import { fromD1, type VaultDatabase } from "@keevault/vault-store";
 
 import {
   INTERNAL_ENVIRONMENT_HEADER,

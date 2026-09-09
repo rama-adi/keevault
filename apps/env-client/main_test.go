@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ramaadi/env-vault/apps/env-client/internal/client"
+	"github.com/ramaadi/keevault/apps/env-client/internal/client"
 )
 
 func TestParseArgsPrefersFlagsOverEnvironment(t *testing.T) {
@@ -170,7 +170,7 @@ func TestRunMainReportsConfigErrors(t *testing.T) {
 	if code := runMain([]string{"--", "true"}, stderr); code != client.ExitConfig {
 		t.Fatalf("exit code = %d, want %d", code, client.ExitConfig)
 	}
-	if !strings.Contains(stderr.String(), "vault-bootstrap:") {
+	if !strings.Contains(stderr.String(), "keevault:") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }

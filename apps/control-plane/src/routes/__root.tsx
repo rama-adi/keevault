@@ -12,7 +12,7 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "robots", content: "noindex, nofollow" },
-      { title: "env-vault" },
+      { title: "keevault" },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
@@ -31,7 +31,7 @@ function RootDocument({ children }: { children: ReactNode }) {
           <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">{children}</main>
           <Separator />
           <footer className="text-muted-foreground mx-auto w-full max-w-5xl px-6 py-6 text-xs">
-            env-vault control plane
+            keevault control plane
           </footer>
         </div>
         <Scripts />
@@ -50,7 +50,7 @@ function AppNav() {
     <header className="border-b">
       <nav className="mx-auto flex w-full max-w-5xl items-center gap-4 px-6 py-4">
         <Link to="/" className="text-sm font-semibold tracking-tight">
-          env-vault
+          keevault
         </Link>
         <div className="flex-1" />
         <Button asChild variant="ghost" size="sm">

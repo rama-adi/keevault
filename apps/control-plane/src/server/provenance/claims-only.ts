@@ -1,4 +1,4 @@
-import type { WorkloadClaims } from "@env-vault/protocol";
+import type { WorkloadClaims } from "@keevault/protocol";
 
 import type { ProvenanceVerifier, VerificationFact, VerificationResult } from "./types.ts";
 

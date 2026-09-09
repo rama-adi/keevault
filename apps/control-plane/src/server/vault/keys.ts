@@ -17,7 +17,7 @@ import {
   unwrapProjectKey as unwrapProjectKeyBytes,
   AES_KEY_LENGTH,
   type Bytes,
-} from "@env-vault/crypto";
+} from "@keevault/crypto";
 import {
   getCurrentEnvironmentKey,
   getCurrentProjectKey,
@@ -25,7 +25,7 @@ import {
   listProjectKeys,
   type ProjectKeyRow,
   type VaultDatabase,
-} from "@env-vault/vault-store";
+} from "@keevault/vault-store";
 import { z } from "zod";
 
 /** Machine-readable reason a key operation failed. Never carries key material. */

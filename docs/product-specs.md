@@ -200,13 +200,13 @@ Reasons:
 Conceptual usage:
 
 ```bash
-vault-bootstrap -- npm run start
+keevault -- npm run start
 ```
 
 or:
 
 ```dockerfile
-ENTRYPOINT ["/usr/local/bin/vault-bootstrap", "--"]
+ENTRYPOINT ["/usr/local/bin/keevault", "--"]
 CMD ["node", "server.js"]
 ```
 
@@ -237,7 +237,7 @@ vault/
 │       └── ...
 │
 ├── cmd/
-│   └── vault-bootstrap/
+│   └── keevault/
 │       └── Go source
 │
 ├── migrations/
@@ -1635,7 +1635,7 @@ The Go process should build the target application's environment and then replac
 Conceptually:
 
 ```text
-vault-bootstrap
+keevault
     │
     │ decrypt
     ▼
@@ -1676,7 +1676,7 @@ supervisor
 then:
 
 ```text
-vault-bootstrap → exec supervisor
+keevault → exec supervisor
 ```
 
 and the supervisor's children inherit the environment.
@@ -2354,7 +2354,7 @@ Implement trusted signing-key management in dashboard.
 Build example Docker image:
 
 ```text
-vault-bootstrap
+keevault
 +
 sample Node/dotenv app
 ```

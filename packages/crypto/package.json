@@ -1,8 +1,8 @@
 {
-  "name": "@env-vault/crypto",
+  "name": "@keevault/crypto",
   "version": "0.0.0",
   "private": true,
-  "description": "Web Crypto implementation of the env-vault key hierarchy, boot envelopes, tokens, fingerprints and CIDR matching.",
+  "description": "Web Crypto implementation of the keevault key hierarchy, boot envelopes, tokens, fingerprints and CIDR matching.",
   "license": "MIT",
   "files": [
     "dist"

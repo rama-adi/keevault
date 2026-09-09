@@ -41,6 +41,7 @@ test("no table holds the plaintext of a stored secret", async () => {
     now: NOW,
   });
   await upsertSecretReplace(db, {
+    expectedVersion: 0,
     id: "sec_ONE",
     environmentId: "env_ONE",
     name: "DATABASE_URL",

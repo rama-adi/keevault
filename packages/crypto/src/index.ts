@@ -1,5 +1,5 @@
 /**
- * @env-vault/crypto
+ * @keevault/crypto
  *
  * Web Crypto only. No runtime dependencies. The same source runs in Cloudflare
  * Workers and in Node 22 or newer.
