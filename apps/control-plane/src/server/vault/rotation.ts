@@ -30,6 +30,7 @@ import {
   buildSetCurrentProjectKeyVersionStatement,
   buildSwitchCurrentEnvironmentKeyStatements,
   getCurrentEnvironmentKey,
+  getEnvironment,
   insertEnvironmentKey,
   insertProjectKey,
   listEnvironmentKeysByProject,
@@ -65,6 +66,12 @@ export async function rotateEnvironmentKey(
   environmentId: string,
 ): Promise<RotateEnvironmentKeyResult> {
   const environment = await requireEnvironment(context, environmentId);
+  if (environment.keyMode === "COLD") {
+    throw new VaultKeyError(
+      "environment_key_missing",
+      `Environment ${environmentId} is COLD and cannot rotate on the server.`,
+    );
+  }
   const currentKeyRow = await getCurrentEnvironmentKey(context.db, environmentId);
   if (currentKeyRow === null) {
     throw new VaultKeyError(
@@ -193,7 +200,12 @@ export async function rotateProjectKey(
   });
 
   const now = context.now();
-  const environmentKeys = await listEnvironmentKeysByProject(context.db, projectId);
+  const allEnvironmentKeys = await listEnvironmentKeysByProject(context.db, projectId);
+  const environmentKeys = [];
+  for (const row of allEnvironmentKeys) {
+    const environment = await getEnvironment(context.db, row.environmentId);
+    if (environment?.keyMode === "CLOUD") environmentKeys.push(row);
+  }
   const rewraps: VaultPreparedStatement[] = [];
   for (const keyRow of environmentKeys) {
     const wrappingKey = await unwrapProjectKeyVersion(

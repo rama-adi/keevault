@@ -21,6 +21,8 @@ export type KeyStatus = z.infer<typeof keyStatusColumn>;
 /** Provenance enforcement mode on an environment. */
 export const provenanceModeColumn = z.enum(["OFF", "ADVISORY", "REQUIRED"]);
 export type ProvenanceMode = z.infer<typeof provenanceModeColumn>;
+export const keyModeColumn = z.enum(["CLOUD", "COLD"]);
+export type KeyMode = z.infer<typeof keyModeColumn>;
 
 /** Boot request lifecycle states (spec section 15). */
 export const bootStatusColumn = z.enum([

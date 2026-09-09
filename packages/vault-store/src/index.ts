@@ -6,6 +6,7 @@ export * from "./repositories/boot-approvals.ts";
 export * from "./repositories/boot-requests.ts";
 export * from "./repositories/bootstrap-tokens.ts";
 export * from "./repositories/environment-keys.ts";
+export * from "./repositories/cold-environment-keys.ts";
 export * from "./repositories/environments.ts";
 export * from "./repositories/project-keys.ts";
 export * from "./repositories/projects.ts";

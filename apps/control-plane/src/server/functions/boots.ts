@@ -36,6 +36,8 @@ import {
   type VerificationResult,
 } from "../provenance/index.ts";
 import { guarded } from "./guarded.ts";
+import { approveCloudBoot } from "../vault/cloud-approval.ts";
+import { loadMasterKeys } from "../vault/keys.ts";
 
 const bootIdSchema = z.string().regex(/^boot_[0-9A-HJKMNP-TV-Z]{26}$/, "That is not a boot id.");
 const reasonSchema = z.string().trim().max(256);
@@ -346,16 +348,21 @@ export const approveBootFn = createServerFn({ method: "POST" })
         const environmentId = await environmentOf(fromD1(env.VAULT_DB), data.bootId);
         if (environmentId === null) return NOT_FOUND;
         return outcome(
-          await stubFor(environmentId).approve({
-            bootId: data.bootId,
-            approverUserId: session.userId,
-            // Better Auth 1.7.2 does not expose the credential that produced the
-            // session, so the approval records the session itself as the
-            // credential. The step-up guard has already proved a passkey
-            // assertion happened within the last five minutes.
-            approverCredentialId: "session",
-            evidenceDigest: data.evidenceDigest,
-          }),
+          await approveCloudBoot(
+            stubFor(environmentId),
+            fromD1(env.VAULT_DB),
+            loadMasterKeys(env),
+            {
+              bootId: data.bootId,
+              approverUserId: session.userId,
+              // Better Auth 1.7.2 does not expose the credential that produced the
+              // session, so the approval records the session itself as the
+              // credential. The step-up guard has already proved a passkey
+              // assertion happened within the last five minutes.
+              approverCredentialId: "session",
+              evidenceDigest: data.evidenceDigest,
+            },
+          ),
         );
       }),
   );

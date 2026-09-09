@@ -69,7 +69,15 @@ export default defineConfig({
   plugins: [
     selectHarnessWorkerEntry(),
     externalizeWorkersModules(),
-    underTest ? null : cloudflare({ viteEnvironment: { name: "ssr" } }),
+    underTest
+      ? null
+      : cloudflare({
+          viteEnvironment: { name: "ssr" },
+          persistState:
+            process.env["VAULT_E2E"] === "1" && process.env["VAULT_E2E_STATE_DIR"]
+              ? { path: process.env["VAULT_E2E_STATE_DIR"] }
+              : true,
+        }),
     tailwindcss(),
     tanstackStart({
       // Custom Worker entry so the Durable Object class can be a named export.

@@ -1,8 +1,10 @@
 # Keevault v2 draft
 
-Status: proposal for discussion, 2026-09-09. The two key modes and approval CLI
-described here are not implemented. Client build reporting is an incremental v1
-change and provides no runtime attestation.
+Status: backend foundation implemented, 2026-09-09. Client build reporting is an
+incremental v1 change and provides no runtime attestation. Explicit key modes
+and cloud approval release are implemented. The cold-key protocol below remains
+a proposal. Cold release, the approval CLI, and encrypted cold import are not
+available yet.
 
 ## Product direction
 
@@ -16,7 +18,7 @@ or a boot is approved.
 | Account authentication | Passkey                                                   | Passkey                                                             |
 | Approval               | Dashboard with recent passkey authentication              | Local CLI with private key and authenticated account                |
 | Who can decrypt        | Keevault infrastructure and approved workloads            | User's local key holder and approved workloads                      |
-| Secret entry           | Dashboard or CLI                                          | Local CLI for the initial release                                   |
+| Secret entry           | Dashboard or CLI                                          | Local CLI, after the signed import protocol is implemented          |
 | Key recovery           | Keevault-managed key availability and recovery procedures | User-held backup or an explicitly authorized recovery key           |
 | Main trust dependency  | Keevault operators, deployed code, and hosting security   | Local CLI, user's device, recipient verification, and workload host |
 
@@ -27,6 +29,22 @@ are separate operations.
 "Cold key" means Keevault does not hold the private key. A key unlocked by an
 online CLI is not air-gapped or permanently offline. Consider "local key mode"
 as the final product name.
+
+Each environment has an explicit `keyMode`, either `CLOUD` or `COLD`. The
+control plane must reject cloud plaintext writes, server-side unwraps, and cloud
+key rotation for a cold environment. Cloud project rotation skips cold
+environments. Do not infer the mode from the presence or absence of a key row.
+
+The current schema work is an in-place WIP change for an undeployed database.
+There is no backward-compatibility promise yet. A fresh local database is
+required while the schema settles; development setup must not silently perform
+an automatic destructive reset.
+
+The cold foundation stores an owner encryption public key using X25519 and an
+owner signing public key using Ed25519. The corresponding private keys never
+enter Keevault. A separate `cold_environment_keys` table is reserved for future
+client-wrapped data keys. It does not make cold encrypted import or release
+available today.
 
 ## Cloud-managed keys
 
@@ -112,9 +130,12 @@ The CLI decrypts the environment's data key locally and re-encrypts that key for
 the waiting workload. The workload decrypts the env values. Approval does not
 upload plaintext or the user's private key, and it does not print secret values.
 
-1. The workload generates ephemeral signing and encryption keys and starts a
-   boot request. It shows the boot ID and encryption-key fingerprint in its
-   terminal or deployment logs.
+The flow below is the target CLI protocol. Cold release remains disabled and
+must fail closed until the CLI signed approval protocol is complete.
+
+1. The workload generates an ephemeral recipient key pair and starts a boot
+   request. It returns the recipient public key, never a receiving private key,
+   and shows the boot ID and key fingerprint in its terminal or deployment logs.
 2. The approval CLI fetches the pending request and shows the environment,
    recipient fingerprint, snapshot version, claims, and available evidence.
 3. The user verifies the recipient fingerprint through a trusted workload
@@ -126,8 +147,9 @@ upload plaintext or the user's private key, and it does not print secret values.
 5. The CLI encrypts the data key to the verified workload public key and signs
    an approval binding the environment, boot ID, boot nonce, recipient keys,
    snapshot version and digest, key version, and expiry.
-6. The control plane checks account permissions and boot state, then relays
-   the signed approval, encrypted data key, and encrypted snapshot.
+6. The control plane forwards the signed approval and encrypted data-key
+   envelope through the waiting Durable Object. It does not decrypt either the
+   data key or the snapshot.
 7. The workload independently checks the signature against an owner key pinned
    during deployment, the recipient binding, snapshot digest, and expiry. It
    decrypts the data key with its ephemeral private key, decrypts the env, then
@@ -137,6 +159,12 @@ Workload owner-key pins must come from user-controlled deployment configuration,
 not a key fetched without verification from the same control plane. A bootstrap
 token still admits requests and limits abuse; it does not grant cold-key
 decryption authority. Server-side approval alone cannot release a cold key.
+
+The cloud release path does not make cold release safe by analogy. An owner
+private key, a cold snapshot's data-key envelope, or a workload receiving
+private key must never enter the cloud path. If mode, boot, approver, key
+version, ciphertext digest, evidence, or expiry no longer matches, completion
+must reject the release.
 
 The implementation must use a reviewed, versioned protocol with domain-separated
 signatures, authenticated metadata, fresh nonces, replay checks, and cross-language
@@ -198,9 +226,78 @@ Implement v2 in separately reviewed stages:
 
 1. Specify the key hierarchy, recipient verification, signed snapshot and
    approval formats, recovery behavior, and hostile-server tests.
-2. Build the local key lifecycle and encrypted snapshot import.
-3. Add cold-key boot delivery, local approval, and independent workload checks.
-4. Add mode selection, migration guidance, and release verification instructions.
+2. Build the local key lifecycle, signed snapshots, and encrypted snapshot
+   import. This includes recipient pinning and verification.
+3. Add cold-key boot delivery, the signed local approval protocol, and
+   independent workload checks. Until then, cold release stays disabled.
+4. Add recovery and enrollment flows, mode selection, migration guidance, and
+   release verification instructions.
+
+### Implemented backend foundation
+
+Environment creation defaults to `CLOUD`. The backend service also accepts
+`COLD` with validated X25519 encryption and Ed25519 signing public keys. Cold
+creation does not create a server-wrapped environment key. There is no mode
+selector or public cold enrollment endpoint yet.
+
+The initial D1 migration now includes:
+
+- `environments.key_mode` and the two owner public keys, with constraints for
+  each mode.
+- A cloud discriminator on `environment_keys` and a separate
+  `cold_environment_keys` table for owner-wrapped key envelopes. Foreign keys
+  prevent storing a cloud key for a cold environment or a cold envelope for a
+  different owner. The cold table is storage preparation, not an import protocol.
+- Approval records with the key mode, environment key version, and release
+  context digest.
+
+The Durable Object stores temporary approval contexts in its own SQLite table.
+Cloud approval now follows this sequence:
+
+1. `prepareApproval` checks authorization and records the workload's public
+   recipient key, boot and environment IDs, mode, key version, approver,
+   ciphertext digest, evidence digest, and expiry. It returns this public
+   release request to the control plane. The workload retains its private key.
+2. `createCloudKeyRelease` checks the environment and recipient, unwraps the
+   cloud data key through the existing master/project key hierarchy, and wraps
+   it for that workload. It clears its plaintext data-key buffer afterward.
+3. `completeApproval` reloads authorization and ciphertext, checks the stored
+   context, then delivers the encrypted envelope and ciphertext to the workload.
+   Contexts expire after at most 60 seconds and cannot authorize a second boot
+   or a different approver. Completion consumes the boot's contexts.
+
+The Durable Object no longer unwraps data keys. The control-plane service and
+Durable Object still share the same Worker deployment and operator trust. This
+refactor is not process isolation and does not make cloud mode inaccessible to
+Keevault operators.
+
+Completion authorizes the snapshot it checks. Later changes to secrets or keys
+do not recall an already authorized release. Cold mode rejects plaintext
+imports, server unwrap, environment rotation, and cloud approval. Project key
+rotation leaves cold envelopes alone.
+
+Tests cover cloud release and workload decryption, context expiry and replay,
+changed ciphertext and key versions, revocation, mode separation, and cold
+plaintext rejection. The end-to-end test uses a temporary database so it can
+exercise the revised initial schema without resetting local development data.
+
+### Still to build
+
+- Finalize the versioned cold envelope, signed complete snapshot, and signed
+  approval formats, including cross-language test vectors and hostile-server
+  tests. The existing cloud wire protocol is unchanged.
+- Build CLI authentication, local key generation and protection, verified key
+  enrollment, encrypted snapshot import, and local approval commands.
+- Add authenticated backend endpoints for cold enrollment, ciphertext imports,
+  and signed release submission. Enforce snapshot versioning and atomic writes.
+- Add workload owner-key pins, independent signature and snapshot verification,
+  trusted recipient fingerprint comparison, and rollback checkpoints.
+- Build backup, recovery, key replacement, team enrollment, and mode conversion.
+  No automatic conversion or deployed-database migration is included here.
+- Set up reviewed CLI releases with pinned versions, checksums, and update
+  control. Decide npm package ownership before publishing.
+- Add mode selection, trust disclosures, and CLI status in the UI once the cold
+  protocol works. This change adds no UI.
 
 Before shipping, decide npm package ownership and distribution, supported owner
 platforms, local key protection, and the exact pairing UX. Test public-key
@@ -225,6 +322,9 @@ remain separate future work.
 
 - [Current secret ingestion](../apps/control-plane/src/server/vault/secrets.ts)
 - [Current boot approval](../apps/control-plane/src/server/durable-objects/boot-session-core.ts)
+- [Cloud key release](../apps/control-plane/src/server/vault/key-release.ts)
+- [Approval coordinator](../apps/control-plane/src/server/vault/cloud-approval.ts)
+- [Vault schema](../migrations/vault/0001_init.sql)
 - [Current envelope implementation](../packages/crypto/src/envelope.ts)
 - [Public-key substitution considerations](https://1password.com/blog/eth-zurich-zero-knowledge-malicious-server-review)
 - [Client-side key wrapping and device approval](https://bitwarden.com/help/bitwarden-security-white-paper/)

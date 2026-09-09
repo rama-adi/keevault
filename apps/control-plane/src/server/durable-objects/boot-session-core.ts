@@ -3,7 +3,8 @@
  *
  * This class holds every rule and every write. It is deliberately free of
  * Cloudflare types: storage, the clock, randomness, the socket registry, the
- * alarm scheduler and the key unwrapper all arrive as dependencies. The Durable
+ * alarm scheduler all arrive as dependencies. Key release happens outside this
+ * state machine; it receives only a workload-encrypted envelope. The Durable
  * Object in environment-session.ts is a thin shell that wires the real
  * implementations in, and the tests wire `node:sqlite` and fakes in instead, so
  * every transition is testable without workerd.
@@ -13,17 +14,13 @@
  * (spec section 20).
  */
 
-import {
-  b64uDecode,
-  createBootEnvelope,
-  keyFingerprint,
-  sha256HexOfText,
-  verifyResume,
-} from "@keevault/crypto";
+import { b64uDecode, keyFingerprint, sha256HexOfText, verifyResume } from "@keevault/crypto";
 import {
   CLOSE_CODES,
   DEFAULT_CHALLENGE_TTL_SECONDS,
   Evidence as EvidenceSchema,
+  KeyEnvelope as KeyEnvelopeSchema,
+  B64U_32_BYTES,
   MAX_PENDING_BOOTS_PER_TOKEN,
   WorkloadClaims as WorkloadClaimsSchema,
   isTerminal,
@@ -34,6 +31,7 @@ import {
   type BootStatus,
   type CloseCode,
   type Evidence,
+  type KeyEnvelope,
   type SecretRecord,
   type ServerMessage,
   type WorkloadClaims,
@@ -47,6 +45,7 @@ import {
   listSecretsForDelivery,
   updateBootRequestStatus,
   type VaultDatabase,
+  type EnvironmentRow,
 } from "@keevault/vault-store";
 import { z } from "zod";
 
@@ -60,7 +59,7 @@ import {
   type VerificationResult,
 } from "../provenance/index.ts";
 import type { AuditAction } from "../vault/audit.ts";
-import type { UnwrappedEnvironmentDek } from "../vault/keys.ts";
+import type { BootKeyReleaseRequest } from "../vault/key-release.ts";
 import type { BootSqlStorage } from "./boot-storage.ts";
 
 /** The largest text frame the server accepts, from the protocol document. */
@@ -112,7 +111,6 @@ export interface BootSessionDeps {
   readonly newAuditId: () => string;
   /** b64u of 32 random bytes. */
   readonly randomChallenge: () => string;
-  readonly unwrapDek: (environmentId: string) => Promise<UnwrappedEnvironmentDek>;
   readonly sockets: BootSocketRegistry;
   /** Called with the next deadline in epoch milliseconds, or null to clear. */
   readonly scheduleAlarm: (at: number | null) => void;
@@ -129,6 +127,8 @@ export const BOOT_ACTION_FAILURES = [
   "policy_blocked",
   "evidence_mismatch",
   "key_error",
+  "cold_key_required",
+  "release_mismatch",
 ] as const;
 
 export type BootActionFailure = (typeof BOOT_ACTION_FAILURES)[number];
@@ -143,6 +143,27 @@ export interface ApproveBootInput {
   readonly approverCredentialId: string;
   /** Digest of the provenance summary the approver actually read. */
   readonly evidenceDigest: string;
+}
+
+/** A short-lived public recipient description for an external key holder. */
+export interface PreparedBootApproval extends BootKeyReleaseRequest {
+  readonly contextId: string;
+  readonly evidenceDigest: string;
+  readonly secretsDigest: string;
+  readonly expiresAt: string;
+  readonly payloadExpiresAt: string;
+}
+
+type BootActionError = Extract<BootActionResult, { ok: false }>;
+
+export type PrepareBootApprovalResult =
+  | { readonly ok: true; readonly request: PreparedBootApproval; readonly contextDigest: string }
+  | BootActionError;
+
+export interface CompleteBootApprovalInput extends ApproveBootInput {
+  readonly contextId: string;
+  readonly contextDigest: string;
+  readonly keyEnvelope: KeyEnvelope;
 }
 
 export interface DeclineBootInput {
@@ -215,6 +236,39 @@ const bootRowSchema = z.object({
 
 type BootRow = z.infer<typeof bootRowSchema>;
 
+interface ApprovalState {
+  readonly ok: true;
+  readonly boot: BootRow;
+  readonly environment: EnvironmentRow;
+  readonly results: readonly VerificationResult[];
+  readonly secrets: SecretRecord[];
+  readonly secretsDigest: string;
+}
+
+const preparedApprovalSchema = z.object({
+  bootId: z.string(),
+  environmentId: z.string(),
+  projectId: z.string(),
+  keyMode: z.enum(["CLOUD", "COLD"]),
+  environmentKeyVersion: z.number().int().positive(),
+  recipientPublicKey: z.string().regex(B64U_32_BYTES),
+  contextId: z.string().regex(B64U_32_BYTES),
+  evidenceDigest: z.string(),
+  secretsDigest: z.string(),
+  expiresAt: z.string(),
+  payloadExpiresAt: z.string(),
+});
+
+const approvalContextSchema = z.object({
+  request_json: z.string(),
+  context_digest: z.string(),
+  approver_user_id: z.string(),
+  approver_credential_id: z.string(),
+});
+
+/** Bound key release to a minute even when boots may wait much longer. */
+export const APPROVAL_CONTEXT_TTL_MS = 60_000;
+
 const challengeRowSchema = z.object({
   boot_id: z.string(),
   challenge: z.string(),
@@ -272,6 +326,16 @@ const SCHEMA_STATEMENTS: readonly string[] = [
      used INTEGER NOT NULL DEFAULT 0,
      PRIMARY KEY (boot_id, challenge)
    )`,
+  `CREATE TABLE IF NOT EXISTS approval_contexts (
+     context_id TEXT PRIMARY KEY,
+     boot_id TEXT NOT NULL REFERENCES boots(id) ON DELETE CASCADE,
+     request_json TEXT NOT NULL,
+     context_digest TEXT NOT NULL,
+     approver_user_id TEXT NOT NULL,
+     approver_credential_id TEXT NOT NULL,
+     expires_at INTEGER NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS approval_contexts_by_boot ON approval_contexts (boot_id)`,
 ];
 
 const BOOT_COLUMNS = `id, environment_id, project_id, status, token_id, source_ip, signing_pk,
@@ -864,16 +928,184 @@ export class BootSessionCore {
 
   // ------------------------------------------------------------------ RPCs
 
-  /**
-   * Approve one boot and deliver the environment key to it.
-   *
-   * Everything is re-checked here, because the dashboard row that produced this
-   * call is a projection and may be stale: the boot must still be PENDING and
-   * unexpired, the bootstrap token must still be valid, the provenance policy
-   * must still be satisfied by a fresh verifier run, and the digest of that run
-   * must equal the one the approver read.
-   */
-  async approve(input: ApproveBootInput): Promise<BootActionResult> {
+  /** Prepare a recipient-bound release request without accessing plaintext keys. */
+  async prepareApproval(input: ApproveBootInput): Promise<PrepareBootApprovalResult> {
+    const state = await this.#approvalState(input);
+    if (!state.ok) return state;
+    const { boot, environment, secretsDigest } = state;
+    if (environment.currentEnvKeyVersion < 1) {
+      return failure(
+        environment.keyMode === "COLD" ? "cold_key_required" : "key_error",
+        "This environment has no provisioned encryption key.",
+      );
+    }
+    const now = this.#deps.now();
+    const expiresAt = Math.min(now + APPROVAL_CONTEXT_TTL_MS, boot.pending_expires_at ?? Infinity);
+    if (expiresAt <= now)
+      return failure("expired", "That boot request expired during preparation.");
+    const request: PreparedBootApproval = {
+      contextId: this.#deps.randomChallenge(),
+      bootId: boot.id,
+      environmentId: boot.environment_id,
+      projectId: boot.project_id,
+      keyMode: environment.keyMode,
+      environmentKeyVersion: environment.currentEnvKeyVersion,
+      recipientPublicKey: boot.encryption_pk,
+      evidenceDigest: input.evidenceDigest,
+      secretsDigest,
+      expiresAt: iso(expiresAt),
+      payloadExpiresAt: iso(now + environment.approvedTtlSeconds * 1000),
+    };
+    const requestJson = JSON.stringify(request);
+    const contextDigest = await sha256HexOfText(requestJson);
+    // Another RPC may have canceled or approved this boot during preparation.
+    if (this.#readBoot(boot.id)?.status !== "PENDING") {
+      return failure("conflict", "That boot changed during preparation.");
+    }
+    this.#deps.storage.exec("DELETE FROM approval_contexts WHERE expires_at <= ?", now);
+    this.#deps.storage.exec(
+      `INSERT INTO approval_contexts
+       (context_id, boot_id, request_json, context_digest, approver_user_id,
+        approver_credential_id, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      request.contextId,
+      boot.id,
+      requestJson,
+      contextDigest,
+      input.approverUserId,
+      input.approverCredentialId,
+      expiresAt,
+    );
+    return { ok: true, request, contextDigest };
+  }
+
+  /** Accept only an encrypted key envelope from the cloud release service. */
+  async completeApproval(input: CompleteBootApprovalInput): Promise<BootActionResult> {
+    const state = await this.#approvalState(input);
+    if (!state.ok) return state;
+    const { boot, environment, results, secrets, secretsDigest } = state;
+    // A later CLI endpoint must authenticate signed cold approvals and the workload
+    // must verify them independently. Never let a cloud RPC stand in for that proof.
+    if (environment.keyMode !== "CLOUD") {
+      return failure("cold_key_required", "Cold environments require a signed local approval.");
+    }
+    const row = this.#deps.storage.exec(
+      "SELECT request_json, context_digest, approver_user_id, approver_credential_id FROM approval_contexts WHERE context_id = ? AND boot_id = ?",
+      input.contextId,
+      input.bootId,
+    )[0];
+    if (row === undefined)
+      return failure("release_mismatch", "No matching key release was prepared.");
+    const context = approvalContextSchema.parse(row);
+    const request = jsonText.pipe(preparedApprovalSchema).parse(context.request_json);
+    if (
+      context.context_digest !== input.contextDigest ||
+      context.approver_user_id !== input.approverUserId ||
+      context.approver_credential_id !== input.approverCredentialId ||
+      request.bootId !== boot.id ||
+      request.environmentId !== environment.id ||
+      request.projectId !== environment.projectId ||
+      request.keyMode !== environment.keyMode ||
+      request.recipientPublicKey !== boot.encryption_pk ||
+      request.environmentKeyVersion !== environment.currentEnvKeyVersion ||
+      request.evidenceDigest !== input.evidenceDigest ||
+      request.secretsDigest !== secretsDigest
+    ) {
+      return failure(
+        "release_mismatch",
+        "The boot, key, or secret snapshot changed after preparation.",
+      );
+    }
+    const envelope = KeyEnvelopeSchema.safeParse(input.keyEnvelope);
+    if (!envelope.success) return failure("key_error", "The key envelope is malformed.");
+    const now = this.#deps.now();
+    const payloadExpiresAt = Date.parse(request.payloadExpiresAt);
+    if (Date.parse(request.expiresAt) <= now || payloadExpiresAt <= now) {
+      return failure("expired", "The prepared key release expired. Prepare a new approval.");
+    }
+    const approved: BootApproved = {
+      type: "boot.approved",
+      bootId: boot.id,
+      projectId: environment.projectId,
+      environmentId: environment.id,
+      environmentKeyVersion: request.environmentKeyVersion,
+      payloadExpiresAt: request.payloadExpiresAt,
+      keyEnvelope: envelope.data,
+      secrets,
+    };
+    const payload = frameText(approved);
+    const payloadDigest = await sha256HexOfText(payload);
+    // Token and time may have changed while hashing the payload. A canceled boot
+    // must never be resurrected by a previously prepared release.
+    const token = await getBootstrapTokenByTokenId(
+      this.#deps.db,
+      boot.token_id.replace(/^tok_/, ""),
+    );
+    const completedAt = this.#deps.now();
+    if (
+      token === null ||
+      token.revokedAt !== null ||
+      (token.expiresAt !== null && Date.parse(token.expiresAt) <= completedAt)
+    ) {
+      return failure("token_invalid", "The bootstrap token is no longer valid.");
+    }
+    if (Date.parse(request.expiresAt) <= completedAt || payloadExpiresAt <= completedAt) {
+      return failure("expired", "The prepared key release expired. Prepare a new approval.");
+    }
+    const current = this.#readBoot(boot.id);
+    if (current === null || current.status !== "PENDING") {
+      return failure("conflict", "That boot changed state while it was being approved.");
+    }
+    if (current.pending_expires_at !== null && current.pending_expires_at <= completedAt) {
+      return failure("expired", "That boot request expired before delivery.");
+    }
+    const next = this.#apply(current, "approve");
+    if (next === null) return failure("conflict", "That boot changed during approval.");
+    this.#deps.storage.exec(
+      `UPDATE boots SET approved_at = ?, payload_expires_at = ?, delivered_frame = ?,
+         payload_digest = ?, provenance_json = ? WHERE id = ?`,
+      completedAt,
+      payloadExpiresAt,
+      payload,
+      payloadDigest,
+      JSON.stringify({ results }),
+      boot.id,
+    );
+    this.#deps.storage.exec("DELETE FROM approval_contexts WHERE boot_id = ?", boot.id);
+    await this.#mirror(boot.id, "APPROVED", "approved");
+    await insertBootApproval(this.#deps.db, {
+      bootId: boot.id,
+      approverUserId: input.approverUserId,
+      approverCredentialId: input.approverCredentialId,
+      approvedAt: iso(completedAt),
+      clientSigningFingerprint: boot.signing_fp,
+      clientEncryptionFingerprint: boot.encryption_fp,
+      evidenceDigest: input.evidenceDigest,
+      keyMode: environment.keyMode,
+      environmentKeyVersion: request.environmentKeyVersion,
+      releaseContextDigest: input.contextDigest,
+    });
+    await this.#audit(
+      "boot.approved",
+      boot,
+      "user",
+      input.approverUserId,
+      new Map<string, string | number | boolean | null>([
+        ["environmentKeyVersion", request.environmentKeyVersion],
+        ["keyMode", environment.keyMode],
+        ["releaseContextDigest", input.contextDigest],
+        ["secretCount", secrets.length],
+        ["evidenceDigest", input.evidenceDigest],
+      ]),
+    );
+    const attached = this.#deps.sockets.forBoot(boot.id);
+    const stored = this.#readBoot(boot.id);
+    if (stored !== null && attached.length > 0) await this.#deliver(stored, attached);
+    this.#recomputeAlarm();
+    return { ok: true, status: this.#readBoot(boot.id)?.status ?? "APPROVED" };
+  }
+
+  /** Load a fresh authorization and ciphertext snapshot when each boundary begins. */
+  async #approvalState(input: ApproveBootInput): Promise<ApprovalState | BootActionError> {
     const boot = this.#readBoot(input.bootId);
     if (boot === null) return failure("not_found", "That boot is unknown to this environment.");
     if (isTerminal(boot.status)) {
@@ -929,13 +1161,6 @@ export class BootSessionCore {
       );
     }
 
-    let unwrapped: UnwrappedEnvironmentDek;
-    try {
-      unwrapped = await this.#deps.unwrapDek(boot.environment_id);
-    } catch {
-      return failure("key_error", "The environment key could not be unwrapped.");
-    }
-
     const secretRows = await listSecretsForDelivery(this.#deps.db, boot.environment_id);
     const secrets: SecretRecord[] = secretRows.map((row) => ({
       id: row.id,
@@ -946,80 +1171,20 @@ export class BootSessionCore {
       ciphertext: row.ciphertext,
     }));
 
-    const payloadExpiresAt = now + environment.approvedTtlSeconds * 1000;
-    const created = await createBootEnvelope({
-      bootId: boot.id,
-      environmentId: boot.environment_id,
-      environmentKeyVersion: unwrapped.version,
-      environmentKey: unwrapped.dek,
-      clientPublicKey: b64uDecode(boot.encryption_pk),
-    });
-    const approved: BootApproved = {
-      type: "boot.approved",
-      bootId: boot.id,
-      projectId: unwrapped.projectId,
-      environmentId: boot.environment_id,
-      environmentKeyVersion: unwrapped.version,
-      payloadExpiresAt: iso(payloadExpiresAt),
-      keyEnvelope: created.envelope,
-      secrets,
-    };
-    const payload = frameText(approved);
-    const payloadDigest = await sha256HexOfText(payload);
-
-    // Critical section. Everything above awaited, so another approve for the
-    // same boot may have run to completion in between: re-read the row and
-    // write the transition and the payload with no await in between, which
-    // JavaScript's single thread makes indivisible. The loser discards the
-    // envelope it built and reports a conflict.
-    const current = this.#readBoot(boot.id);
-    if (current === null || current.status !== "PENDING") {
-      return failure("conflict", "That boot changed state while it was being approved.");
+    if (secrets.some((secret) => secret.envKeyVersion !== environment.currentEnvKeyVersion)) {
+      return failure(
+        "key_error",
+        "The secret snapshot does not match the current environment key.",
+      );
     }
-    const next = this.#apply(current, "approve");
-    if (next === null) {
-      return failure("conflict", "That boot changed state while it was being approved.");
-    }
-    this.#deps.storage.exec(
-      `UPDATE boots SET approved_at = ?, payload_expires_at = ?, delivered_frame = ?,
-         payload_digest = ?, provenance_json = ? WHERE id = ?`,
-      now,
-      payloadExpiresAt,
-      payload,
-      payloadDigest,
-      JSON.stringify({ results }),
-      boot.id,
-    );
-    await this.#mirror(boot.id, "APPROVED", "approved");
-    await insertBootApproval(this.#deps.db, {
-      bootId: boot.id,
-      approverUserId: input.approverUserId,
-      approverCredentialId: input.approverCredentialId,
-      approvedAt: iso(now),
-      clientSigningFingerprint: boot.signing_fp,
-      clientEncryptionFingerprint: boot.encryption_fp,
-      evidenceDigest: digest,
-    });
-    await this.#audit(
-      "boot.approved",
+    return {
+      ok: true,
       boot,
-      "user",
-      input.approverUserId,
-      new Map<string, string | number | boolean | null>([
-        ["environmentKeyVersion", unwrapped.version],
-        ["secretCount", secrets.length],
-        ["evidenceDigest", digest],
-      ]),
-    );
-
-    const attached = this.#deps.sockets.forBoot(boot.id);
-    const stored = this.#readBoot(boot.id);
-    if (stored !== null && attached.length > 0) {
-      await this.#deliver(stored, attached);
-    }
-    this.#recomputeAlarm();
-    const final = this.#readBoot(boot.id);
-    return { ok: true, status: final?.status ?? "APPROVED" };
+      environment,
+      results,
+      secrets,
+      secretsDigest: await sha256HexOfText(JSON.stringify(secrets)),
+    };
   }
 
   async decline(input: DeclineBootInput): Promise<BootActionResult> {
@@ -1143,6 +1308,6 @@ export class BootSessionCore {
   }
 }
 
-function failure(reason: BootActionFailure, message: string): BootActionResult {
+function failure(reason: BootActionFailure, message: string): BootActionError {
   return { ok: false, reason, message };
 }

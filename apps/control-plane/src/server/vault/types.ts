@@ -39,6 +39,7 @@ export interface EnvironmentSummary {
   projectId: string;
   slug: string;
   name: string;
+  keyMode: "CLOUD" | "COLD";
   environmentKeyVersion: number;
   provenanceMode: "OFF" | "ADVISORY" | "REQUIRED";
   pendingTtlSeconds: number;
@@ -53,6 +54,7 @@ export function toEnvironmentSummary(row: EnvironmentRow): EnvironmentSummary {
     projectId: row.projectId,
     slug: row.slug,
     name: row.name,
+    keyMode: row.keyMode,
     environmentKeyVersion: row.currentEnvKeyVersion,
     provenanceMode: row.provenanceMode,
     pendingTtlSeconds: row.pendingTtlSeconds,

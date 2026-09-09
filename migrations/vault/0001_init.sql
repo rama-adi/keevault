@@ -35,6 +35,9 @@ CREATE TABLE environments (
   project_id TEXT NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
   slug TEXT NOT NULL,
   name TEXT NOT NULL,
+  key_mode TEXT NOT NULL DEFAULT 'CLOUD' CHECK (key_mode IN ('CLOUD', 'COLD')),
+  owner_encryption_public_key TEXT,
+  owner_signing_public_key TEXT,
   current_env_key_version INTEGER NOT NULL DEFAULT 0,
   provenance_mode TEXT NOT NULL DEFAULT 'ADVISORY'
     CHECK (provenance_mode IN ('OFF', 'ADVISORY', 'REQUIRED')),
@@ -42,13 +45,19 @@ CREATE TABLE environments (
   approved_ttl_seconds INTEGER NOT NULL DEFAULT 300,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  UNIQUE (project_id, slug)
+  UNIQUE (project_id, slug),
+  UNIQUE (id, key_mode),
+  UNIQUE (id, key_mode, owner_encryption_public_key),
+  CHECK ((key_mode = 'CLOUD' AND owner_encryption_public_key IS NULL AND owner_signing_public_key IS NULL)
+       OR (key_mode = 'COLD' AND owner_encryption_public_key IS NOT NULL AND owner_signing_public_key IS NOT NULL
+           AND length(owner_encryption_public_key) = 43 AND length(owner_signing_public_key) = 43))
 );
 
 CREATE INDEX environments_by_project ON environments (project_id);
 
 CREATE TABLE environment_keys (
   environment_id TEXT NOT NULL REFERENCES environments (id) ON DELETE CASCADE,
+  key_mode TEXT NOT NULL DEFAULT 'CLOUD' CHECK (key_mode = 'CLOUD'),
   version INTEGER NOT NULL,
   project_key_version INTEGER NOT NULL,
   wrapped_key TEXT NOT NULL,
@@ -56,10 +65,28 @@ CREATE TABLE environment_keys (
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'retired')),
   created_at TEXT NOT NULL,
   retired_at TEXT,
-  PRIMARY KEY (environment_id, version)
+  PRIMARY KEY (environment_id, version),
+  FOREIGN KEY (environment_id, key_mode) REFERENCES environments (id, key_mode)
 );
 
 CREATE INDEX environment_keys_by_environment_status ON environment_keys (environment_id, status);
+CREATE TABLE cold_environment_keys (
+  environment_id TEXT NOT NULL REFERENCES environments (id) ON DELETE CASCADE,
+  key_mode TEXT NOT NULL DEFAULT 'COLD' CHECK (key_mode = 'COLD'),
+  version INTEGER NOT NULL CHECK (version > 0),
+  recipient_public_key TEXT NOT NULL CHECK (length(recipient_public_key) = 43),
+  ephemeral_public_key TEXT NOT NULL CHECK (length(ephemeral_public_key) = 43),
+  salt TEXT NOT NULL CHECK (length(salt) = 43),
+  nonce TEXT NOT NULL CHECK (length(nonce) = 16),
+  wrapped_key TEXT NOT NULL CHECK (length(wrapped_key) = 64),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'retired')),
+  created_at TEXT NOT NULL,
+  retired_at TEXT,
+  PRIMARY KEY (environment_id, version),
+  FOREIGN KEY (environment_id, key_mode, recipient_public_key)
+    REFERENCES environments (id, key_mode, owner_encryption_public_key)
+);
+
 
 CREATE TABLE secrets (
   id TEXT PRIMARY KEY,
@@ -167,7 +194,10 @@ CREATE TABLE boot_approvals (
   approved_at TEXT NOT NULL,
   client_signing_fingerprint TEXT NOT NULL,
   client_encryption_fingerprint TEXT NOT NULL,
-  evidence_digest TEXT NOT NULL
+  evidence_digest TEXT NOT NULL,
+  key_mode TEXT NOT NULL DEFAULT 'CLOUD' CHECK (key_mode IN ('CLOUD', 'COLD')),
+  environment_key_version INTEGER NOT NULL CHECK (environment_key_version > 0),
+  release_context_digest TEXT NOT NULL
 );
 
 CREATE INDEX boot_approvals_by_approver ON boot_approvals (approver_user_id, approved_at);

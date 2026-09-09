@@ -62,9 +62,15 @@ export async function putSecret(
   context: VaultContext,
   input: PutSecretInput,
 ): Promise<PutSecretResult> {
+  const environment = await requireEnvironment(context, input.environmentId);
+  if (environment.keyMode === "COLD") {
+    throw new VaultInputError(
+      "keyMode",
+      "Cold environments require encrypted writes from a local key holder.",
+    );
+  }
   assertSecretName(input.name);
   assertSecretValue(input.value);
-  const environment = await requireEnvironment(context, input.environmentId);
   const dek = await unwrapEnvironmentDek(context.db, context.keyring, input.environmentId);
   const now = context.now();
   const result = await writeSecret(context, {
@@ -194,6 +200,12 @@ export async function importDotenv(
   input: ImportDotenvInput,
 ): Promise<ImportDotenvResult> {
   const environment = await requireEnvironment(context, input.environmentId);
+  if (environment.keyMode === "COLD") {
+    throw new VaultInputError(
+      "keyMode",
+      "Cold environments require encrypted imports from a local key holder.",
+    );
+  }
   const parsed = parseDotenv(input.content);
   if (parsed.problems.length > 0) {
     throw new VaultInputError("content", describeProblems(parsed.problems));

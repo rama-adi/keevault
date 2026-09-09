@@ -44,8 +44,8 @@ export async function insertEnvironmentKey(
   const statement = db
     .prepare(
       `INSERT INTO environment_keys
-         (environment_id, version, project_key_version, wrapped_key, nonce, status, created_at)
-       VALUES (?, ?, ?, ?, ?, 'active', ?)
+         (environment_id, key_mode, version, project_key_version, wrapped_key, nonce, status, created_at)
+       VALUES (?, 'CLOUD', ?, ?, ?, ?, 'active', ?)
        RETURNING ${environmentKeyColumns}`,
     )
     .bind(

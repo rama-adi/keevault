@@ -215,6 +215,12 @@ export async function unwrapEnvironmentDek(
   if (environment === null) {
     throw new VaultKeyError("environment_missing", `Environment ${environmentId} does not exist.`);
   }
+  if (environment.keyMode === "COLD") {
+    throw new VaultKeyError(
+      "environment_key_missing",
+      `Environment ${environmentId} is COLD and has no server key.`,
+    );
+  }
   const keyRow = await getCurrentEnvironmentKey(db, environmentId);
   if (keyRow === null) {
     throw new VaultKeyError(

@@ -7,7 +7,19 @@
  * derived from another key (spec section 7).
  */
 
-import { b64uEncode, generateKey32, wrapEnvironmentKey, wrapProjectKey } from "@keevault/crypto";
+import {
+  b64uDecode,
+  b64uEncode,
+  generateKey32,
+  wrapEnvironmentKey,
+  wrapProjectKey,
+  importX25519PublicKey,
+  importEd25519PublicKey,
+  deriveEnvelopeWrapKey,
+  generateX25519PrivateKey,
+  randomBytes,
+  type Bytes,
+} from "@keevault/crypto";
 import {
   createEnvironment as createEnvironmentRow,
   createProject as createProjectRow,
@@ -178,6 +190,9 @@ export interface CreateEnvironmentInput {
   projectId: string;
   slug: string;
   name: string;
+  keyMode?: "CLOUD" | "COLD";
+  ownerEncryptionPublicKey?: string;
+  ownerSigningPublicKey?: string;
 }
 
 /** Create an environment and its first environment key. */
@@ -196,6 +211,73 @@ export async function createEnvironment(
 
   const now = context.now();
   const environmentId = generatePrefixedUlidId("env");
+  const keyMode = input.keyMode ?? "CLOUD";
+  if (keyMode === "COLD") {
+    if (!input.ownerEncryptionPublicKey || !input.ownerSigningPublicKey) {
+      throw new VaultInputError(
+        "keyMode",
+        "COLD environments require owner encryption and signing public keys.",
+      );
+    }
+    for (const [field, value] of [
+      ["ownerEncryptionPublicKey", input.ownerEncryptionPublicKey],
+      ["ownerSigningPublicKey", input.ownerSigningPublicKey],
+    ] as const) {
+      let bytes: Bytes;
+      try {
+        bytes = b64uDecode(value);
+      } catch {
+        throw new VaultInputError(field, "Public key must be base64url encoded.");
+      }
+      if (bytes.length !== 32)
+        throw new VaultInputError(field, "Public key must encode exactly 32 bytes.");
+      try {
+        if (field === "ownerEncryptionPublicKey") {
+          await importX25519PublicKey(bytes);
+          await deriveEnvelopeWrapKey({
+            privateKey: generateX25519PrivateKey(),
+            peerPublicKey: bytes,
+            salt: randomBytes(32),
+            info: "keevault:validate-owner-key",
+          });
+        } else await importEd25519PublicKey(bytes);
+      } catch {
+        throw new VaultInputError(field, "Public key is not a usable key.");
+      }
+    }
+  }
+  if (keyMode === "COLD") {
+    await createEnvironmentRow(context.db, {
+      id: environmentId,
+      projectId: input.projectId,
+      slug: input.slug,
+      name: input.name,
+      keyMode,
+      ownerEncryptionPublicKey: input.ownerEncryptionPublicKey,
+      ownerSigningPublicKey: input.ownerSigningPublicKey,
+      provenanceMode: "ADVISORY",
+      pendingTtlSeconds: DEFAULT_PENDING_TTL_SECONDS,
+      approvedTtlSeconds: DEFAULT_APPROVED_TTL_SECONDS,
+      now,
+    });
+    await writeAuditEvent(
+      { db: context.db, actor: context.actor, timestamp: now },
+      {
+        action: "environment.created",
+        projectId: input.projectId,
+        environmentId,
+        bootId: null,
+        metadata: new Map<string, AuditMetadataValue>([
+          ["slug", input.slug],
+          ["keyMode", "COLD"],
+        ]),
+      },
+    );
+    return toEnvironmentSummary(await requireEnvironment(context, environmentId));
+  }
+  if (input.ownerEncryptionPublicKey !== undefined || input.ownerSigningPublicKey !== undefined) {
+    throw new VaultInputError("keyMode", "Cloud environments do not accept local owner keys.");
+  }
   const projectKey = await unwrapProjectKey(context.db, context.keyring, input.projectId);
   const environmentKey = generateKey32();
   const sealed = await wrapEnvironmentKey({
@@ -212,6 +294,7 @@ export async function createEnvironment(
     projectId: input.projectId,
     slug: input.slug,
     name: input.name,
+    keyMode,
     provenanceMode: "ADVISORY",
     pendingTtlSeconds: DEFAULT_PENDING_TTL_SECONDS,
     approvedTtlSeconds: DEFAULT_APPROVED_TTL_SECONDS,
@@ -242,6 +325,7 @@ export async function createEnvironment(
       metadata: new Map<string, AuditMetadataValue>([
         ["slug", input.slug],
         ["environmentKeyVersion", 1],
+        ["keyMode", "CLOUD"],
         ["projectKeyVersion", projectKey.version],
       ]),
     },

@@ -2,6 +2,8 @@ import { DatabaseSync } from "node:sqlite";
 
 import {
   b64uEncode,
+  b64uDecode,
+  createBootEnvelope,
   ed25519PublicKeyFromSeed,
   generateEd25519Seed,
   generatePrefixedUlid,
@@ -30,7 +32,6 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { createTestVault } from "../bootstrap/test-vault.ts";
 import { summaryDigest, V1_VERIFIERS } from "../provenance/index.ts";
-import type { UnwrappedEnvironmentDek } from "../vault/keys.ts";
 import { BootSessionCore, type BootIdentity, type BootView } from "./boot-session-core.ts";
 import { FakeConnection, FakeSocketRegistry, fromNodeSqliteStorage } from "./test-support.ts";
 
@@ -91,6 +92,10 @@ async function createHarness(
     approvedTtlSeconds: PAYLOAD_TTL_SECONDS,
     now,
   });
+  await vault.db
+    .prepare("UPDATE environments SET current_env_key_version = 1 WHERE id = ?")
+    .bind(environmentId)
+    .run();
   await createBootstrapToken(vault.db, {
     id: tokenId,
     environmentId,
@@ -127,8 +132,6 @@ async function createHarness(
       newBootId: () => generatePrefixedUlid("boot"),
       newAuditId: () => generatePrefixedUlid("aud"),
       randomChallenge: () => generateResumeChallenge(),
-      unwrapDek: (): Promise<UnwrappedEnvironmentDek> =>
-        Promise.resolve({ projectId, dek, version: 1 }),
       sockets: { forBoot: (bootId: string) => sockets.forBoot(bootId) },
       scheduleAlarm: (at: number | null) => {
         alarms.push(at);
@@ -233,13 +236,178 @@ async function approve(
 ) {
   const boot = view ?? core.get(bootId);
   if (boot === null) throw new Error("boot is missing");
-  return await core.approve({
+  const input = {
     bootId,
     approverUserId: "user_1",
     approverCredentialId: "cred_1",
     evidenceDigest: await summaryDigest(boot.provenance),
+  };
+  const prepared = await core.prepareApproval(input);
+  if (!prepared.ok) return prepared;
+  const created = await createBootEnvelope({
+    bootId,
+    environmentId: prepared.request.environmentId,
+    environmentKeyVersion: prepared.request.environmentKeyVersion,
+    environmentKey: harness.dek,
+    clientPublicKey: b64uDecode(prepared.request.recipientPublicKey),
+  });
+  return await core.completeApproval({
+    ...input,
+    contextId: prepared.request.contextId,
+    contextDigest: prepared.contextDigest,
+    keyEnvelope: created.envelope,
   });
 }
+
+async function prepareRelease(harness: Harness, bootId: string) {
+  const core = harness.core();
+  const input = {
+    bootId,
+    approverUserId: "user_1",
+    approverCredentialId: "cred_1",
+    evidenceDigest: await summaryDigest(core.get(bootId)?.provenance ?? []),
+  };
+  const prepared = await core.prepareApproval(input);
+  if (!prepared.ok) throw new Error(prepared.message);
+  const created = await createBootEnvelope({
+    bootId,
+    environmentId: prepared.request.environmentId,
+    environmentKeyVersion: prepared.request.environmentKeyVersion,
+    environmentKey: harness.dek,
+    clientPublicKey: b64uDecode(prepared.request.recipientPublicKey),
+  });
+  return {
+    prepared,
+    completion: {
+      ...input,
+      contextId: prepared.request.contextId,
+      contextDigest: prepared.contextDigest,
+      keyEnvelope: created.envelope,
+    },
+  };
+}
+
+describe("external key release", () => {
+  it("exposes only the workload recipient and completes across hibernation", async () => {
+    const harness = await createHarness();
+    const keys = await bootKeys();
+    const { bootId } = await startBoot(harness, keys);
+    const { prepared, completion } = await prepareRelease(harness, bootId);
+    expect(prepared.request.recipientPublicKey).toBe(keys.encryptionPublicKey);
+    expect(prepared.request.keyMode).toBe("CLOUD");
+    expect(harness.core().get(bootId)?.status).toBe("PENDING");
+    expect(await harness.restart().completeApproval(completion)).toMatchObject({ ok: true });
+    const approval = await harness.db
+      .prepare(
+        "SELECT key_mode, environment_key_version, release_context_digest FROM boot_approvals WHERE boot_id = ?",
+      )
+      .bind(bootId)
+      .first();
+    expect(approval).toMatchObject({
+      key_mode: "CLOUD",
+      environment_key_version: 1,
+      release_context_digest: prepared.contextDigest,
+    });
+    expect(await harness.restart().completeApproval(completion)).toMatchObject({ ok: false });
+  });
+
+  it("binds a prepared release to its boot, approver, and context digest", async () => {
+    const harness = await createHarness();
+    const first = await startBoot(harness, await bootKeys());
+    const second = await startBoot(harness, await bootKeys());
+    const { completion } = await prepareRelease(harness, first.bootId);
+    for (const changed of [
+      { ...completion, bootId: second.bootId },
+      { ...completion, approverUserId: "other-user" },
+      { ...completion, approverCredentialId: "other-credential" },
+      { ...completion, contextDigest: "0".repeat(64) },
+    ]) {
+      expect(await harness.core().completeApproval(changed)).toMatchObject({
+        ok: false,
+        reason: "release_mismatch",
+      });
+    }
+    expect(harness.core().get(first.bootId)?.status).toBe("PENDING");
+  });
+
+  it("expires a prepared release without expiring the still-pending boot", async () => {
+    const harness = await createHarness();
+    const { bootId } = await startBoot(harness, await bootKeys());
+    const { completion } = await prepareRelease(harness, bootId);
+    harness.clock.now += 60_000;
+    expect(await harness.core().completeApproval(completion)).toMatchObject({
+      ok: false,
+      reason: "expired",
+    });
+    expect(harness.core().get(bootId)?.status).toBe("PENDING");
+    expect(await approve(harness, bootId)).toMatchObject({ ok: true });
+  });
+
+  it("rejects changed ciphertext after preparation", async () => {
+    const harness = await createHarness();
+    const { bootId } = await startBoot(harness, await bootKeys());
+    const { completion } = await prepareRelease(harness, bootId);
+    await harness.db
+      .prepare("UPDATE secrets SET ciphertext = ? WHERE environment_id = ?")
+      .bind(b64uEncode(randomBytes(48)), harness.environmentId)
+      .run();
+    expect(await harness.core().completeApproval(completion)).toMatchObject({
+      ok: false,
+      reason: "release_mismatch",
+    });
+  });
+
+  it("rejects a key rotation after preparation", async () => {
+    const harness = await createHarness();
+    const { bootId } = await startBoot(harness, await bootKeys());
+    const { completion } = await prepareRelease(harness, bootId);
+    await harness.db
+      .prepare("UPDATE environments SET current_env_key_version = 2 WHERE id = ?")
+      .bind(harness.environmentId)
+      .run();
+    await harness.db
+      .prepare("UPDATE secrets SET env_key_version = 2 WHERE environment_id = ?")
+      .bind(harness.environmentId)
+      .run();
+    expect(await harness.core().completeApproval(completion)).toMatchObject({
+      ok: false,
+      reason: "release_mismatch",
+    });
+  });
+
+  it("rejects token revocation after preparation", async () => {
+    const harness = await createHarness();
+    const { bootId } = await startBoot(harness, await bootKeys());
+    const { completion } = await prepareRelease(harness, bootId);
+    await revokeBootstrapToken(harness.db, {
+      tokenRowId: harness.tokenId,
+      now: new Date(harness.clock.now).toISOString(),
+    });
+    expect(await harness.core().completeApproval(completion)).toMatchObject({
+      ok: false,
+      reason: "token_invalid",
+    });
+  });
+
+  it("never accepts a cloud envelope for a cold environment", async () => {
+    const harness = await createHarness();
+    const { bootId } = await startBoot(harness, await bootKeys());
+    const { completion } = await prepareRelease(harness, bootId);
+    // This fixture has no stored cloud key, so simulate selecting cold mode
+    // before provisioning. The backend must still reject the existing envelope.
+    const owner = await bootKeys();
+    await harness.db
+      .prepare(
+        "UPDATE environments SET key_mode = 'COLD', owner_encryption_public_key = ?, owner_signing_public_key = ? WHERE id = ?",
+      )
+      .bind(owner.encryptionPublicKey, owner.signingPublicKey, harness.environmentId)
+      .run();
+    expect(await harness.core().completeApproval(completion)).toMatchObject({
+      ok: false,
+      reason: "cold_key_required",
+    });
+  });
+});
 
 describe("boot.hello", () => {
   it("persists a client report across hibernation without treating it as verified evidence", async () => {
@@ -550,7 +718,7 @@ describe("approval and delivery", () => {
     const keys = await bootKeys();
     const { bootId } = await startBoot(harness, keys);
 
-    const result = await harness.core().approve({
+    const result = await harness.core().prepareApproval({
       bootId,
       approverUserId: "user_1",
       approverCredentialId: "cred_1",

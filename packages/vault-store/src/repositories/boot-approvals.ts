@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { timestampColumn } from "../columns.ts";
+import { timestampColumn, keyModeColumn, integerColumn, type KeyMode } from "../columns.ts";
 import type { VaultDatabase } from "../d1.ts";
 import { selectOne, selectRequired } from "../sql.ts";
 
@@ -13,6 +13,9 @@ export const bootApprovalRowSchema = z.object({
   clientSigningFingerprint: z.string(),
   clientEncryptionFingerprint: z.string(),
   evidenceDigest: z.string(),
+  keyMode: keyModeColumn,
+  environmentKeyVersion: integerColumn,
+  releaseContextDigest: z.string(),
 });
 
 export type BootApprovalRow = z.infer<typeof bootApprovalRowSchema>;
@@ -24,7 +27,10 @@ const bootApprovalColumns = `
   approved_at AS approvedAt,
   client_signing_fingerprint AS clientSigningFingerprint,
   client_encryption_fingerprint AS clientEncryptionFingerprint,
-  evidence_digest AS evidenceDigest
+  evidence_digest AS evidenceDigest,
+  key_mode AS keyMode,
+  environment_key_version AS environmentKeyVersion,
+  release_context_digest AS releaseContextDigest
 `;
 
 export interface InsertBootApprovalInput {
@@ -38,6 +44,9 @@ export interface InsertBootApprovalInput {
   clientEncryptionFingerprint: string;
   /** Hex SHA-256 of the stored provenance summary JSON. */
   evidenceDigest: string;
+  keyMode: KeyMode;
+  environmentKeyVersion: number;
+  releaseContextDigest: string;
 }
 
 export async function insertBootApproval(
@@ -48,8 +57,9 @@ export async function insertBootApproval(
     .prepare(
       `INSERT INTO boot_approvals
          (boot_id, approver_user_id, approver_credential_id, approved_at,
-          client_signing_fingerprint, client_encryption_fingerprint, evidence_digest)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+          client_signing_fingerprint, client_encryption_fingerprint, evidence_digest,
+          key_mode, environment_key_version, release_context_digest)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING ${bootApprovalColumns}`,
     )
     .bind(
@@ -60,6 +70,9 @@ export async function insertBootApproval(
       input.clientSigningFingerprint,
       input.clientEncryptionFingerprint,
       input.evidenceDigest,
+      input.keyMode,
+      input.environmentKeyVersion,
+      input.releaseContextDigest,
     );
   return await selectRequired(statement, bootApprovalRowSchema);
 }

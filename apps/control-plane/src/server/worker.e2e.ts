@@ -19,6 +19,7 @@ import { z } from "zod";
 import worker from "./worker.ts";
 import { summaryDigest } from "./provenance/index.ts";
 import type { BootActionResult, BootView } from "./durable-objects/boot-session-core.ts";
+import { approveCloudBoot } from "./vault/cloud-approval.ts";
 import { systemClock, type VaultContext } from "./vault/context.ts";
 import { loadMasterKeys } from "./vault/keys.ts";
 import { workerBootSessionControl } from "./vault/runtime.ts";
@@ -154,12 +155,17 @@ async function approve(env: Env, bootId: string): Promise<Response> {
   return json(
     200,
     outcome(
-      await stubFor(env, environmentId).approve({
-        bootId,
-        approverUserId: "e2e",
-        approverCredentialId: "e2e",
-        evidenceDigest: await summaryDigest(view.provenance),
-      }),
+      await approveCloudBoot(
+        stubFor(env, environmentId),
+        fromD1(env.VAULT_DB),
+        loadMasterKeys(env),
+        {
+          bootId,
+          approverUserId: "e2e",
+          approverCredentialId: "e2e",
+          evidenceDigest: await summaryDigest(view.provenance),
+        },
+      ),
     ),
   );
 }

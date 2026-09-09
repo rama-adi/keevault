@@ -457,6 +457,9 @@ describe("boot requests", () => {
       clientSigningFingerprint: "b".repeat(64),
       clientEncryptionFingerprint: "c".repeat(64),
       evidenceDigest: "d".repeat(64),
+      keyMode: "CLOUD",
+      environmentKeyVersion: 1,
+      releaseContextDigest: "e".repeat(64),
     });
     const approval = await getBootApproval(db, "boot_A");
     expect(approval?.approverCredentialId).toBe("cred_1");
@@ -618,6 +621,9 @@ describe("cascades", () => {
       clientSigningFingerprint: "b".repeat(64),
       clientEncryptionFingerprint: "c".repeat(64),
       evidenceDigest: "d".repeat(64),
+      keyMode: "CLOUD",
+      environmentKeyVersion: 1,
+      releaseContextDigest: "e".repeat(64),
     });
 
     await deleteEnvironment(db, ENVIRONMENT_ID);

@@ -2,6 +2,8 @@ import { DatabaseSync } from "node:sqlite";
 
 import {
   b64uEncode,
+  b64uDecode,
+  createBootEnvelope,
   ed25519PublicKeyFromSeed,
   generateEd25519Seed,
   generatePrefixedUlid,
@@ -26,7 +28,6 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import { createTestVault } from "../bootstrap/test-vault.ts";
 import { summaryDigest, V1_VERIFIERS } from "../provenance/index.ts";
-import type { UnwrappedEnvironmentDek } from "../vault/keys.ts";
 import {
   BOOT_RATE_WINDOW_SECONDS,
   BootSessionCore,
@@ -68,7 +69,7 @@ async function bootKeys(): Promise<BootKeys> {
 }
 
 /**
- * A one-shot pause the first `unwrapDek` call waits on. It lets a test start
+ * A one-shot pause the first external key release waits on. It lets a test start
  * one approval, park it inside the awaits that run before the transition, and
  * run a second approval to completion in the gap.
  */
@@ -122,6 +123,7 @@ interface Harness {
   clock: { now: number };
   gate: Gate;
   core: BootSessionCore;
+  dek: Bytes;
 }
 
 async function createHarness(): Promise<Harness> {
@@ -143,6 +145,10 @@ async function createHarness(): Promise<Harness> {
     approvedTtlSeconds: PAYLOAD_TTL_SECONDS,
     now,
   });
+  await vault.db
+    .prepare("UPDATE environments SET current_env_key_version = 1 WHERE id = ?")
+    .bind(environmentId)
+    .run();
   for (const [id, label] of [
     [tokenId, "zeabur-prod-01"],
     [secondTokenId, "backup-vps"],
@@ -183,10 +189,6 @@ async function createHarness(): Promise<Harness> {
     newBootId: () => generatePrefixedUlid("boot"),
     newAuditId: () => generatePrefixedUlid("aud"),
     randomChallenge: () => generateResumeChallenge(),
-    unwrapDek: async (): Promise<UnwrappedEnvironmentDek> => {
-      await gate.pass();
-      return { projectId, dek, version: 1 };
-    },
     sockets: { forBoot: (bootId: string) => sockets.forBoot(bootId) },
     scheduleAlarm: () => undefined,
     verifiers: V1_VERIFIERS,
@@ -204,6 +206,7 @@ async function createHarness(): Promise<Harness> {
     clock,
     gate,
     core,
+    dek,
   };
 }
 
@@ -296,11 +299,27 @@ async function resume(
 async function approve(harness: Harness, bootId: string) {
   const view = harness.core.get(bootId);
   if (view === null) throw new Error("boot is missing");
-  return await harness.core.approve({
+  const input = {
     bootId,
     approverUserId: "user_1",
     approverCredentialId: "cred_1",
     evidenceDigest: await summaryDigest(view.provenance),
+  };
+  const prepared = await harness.core.prepareApproval(input);
+  if (!prepared.ok) return prepared;
+  await harness.gate.pass();
+  const created = await createBootEnvelope({
+    bootId,
+    environmentId: prepared.request.environmentId,
+    environmentKeyVersion: prepared.request.environmentKeyVersion,
+    environmentKey: harness.dek,
+    clientPublicKey: b64uDecode(prepared.request.recipientPublicKey),
+  });
+  return await harness.core.completeApproval({
+    ...input,
+    contextId: prepared.request.contextId,
+    contextDigest: prepared.contextDigest,
+    keyEnvelope: created.envelope,
   });
 }
 
@@ -638,7 +657,7 @@ describe("an approval the approver did not read", () => {
     const keys = await bootKeys();
     const { bootId } = await startBoot(harness, keys);
 
-    const result = await harness.core.approve({
+    const result = await harness.core.prepareApproval({
       bootId,
       approverUserId: "user_1",
       approverCredentialId: "cred_1",
@@ -665,7 +684,7 @@ describe("an approval the approver did not read", () => {
     expect(otherDigest).toBe(sameDigest);
 
     const tampered = `${otherDigest.slice(0, 63)}${otherDigest.endsWith("a") ? "b" : "a"}`;
-    const result = await harness.core.approve({
+    const result = await harness.core.prepareApproval({
       bootId: first.bootId,
       approverUserId: "user_1",
       approverCredentialId: "cred_1",

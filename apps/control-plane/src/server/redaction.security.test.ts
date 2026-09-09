@@ -28,6 +28,7 @@ import {
 import { log } from "./log.ts";
 import { V1_VERIFIERS, summaryDigest } from "./provenance/index.ts";
 import { unwrapEnvironmentDek } from "./vault/keys.ts";
+import { approveCloudBoot } from "./vault/cloud-approval.ts";
 import {
   createBootstrapToken,
   createEnvironment,
@@ -212,7 +213,6 @@ test("a full administrative session and boot leak nothing through logs or stored
     newBootId: () => generatePrefixedUlid("boot"),
     newAuditId: () => generatePrefixedUlid("aud"),
     randomChallenge: () => generateResumeChallenge(),
-    unwrapDek: async () => await unwrapEnvironmentDek(context.db, context.keyring, environment.id),
     sockets: { forBoot: (bootId: string) => sockets.forBoot(bootId) },
     scheduleAlarm: () => undefined,
     verifiers: V1_VERIFIERS,
@@ -252,7 +252,7 @@ test("a full administrative session and boot leak nothing through logs or stored
   const bootId = pending.bootId;
 
   const view = core.get(bootId);
-  const approved = await core.approve({
+  const approved = await approveCloudBoot(core, context.db, context.keyring, {
     bootId,
     approverUserId: "user_1",
     approverCredentialId: "cred_1",

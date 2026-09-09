@@ -11,11 +11,11 @@ import {
   INTERNAL_TOKEN_HEADER,
 } from "../bootstrap/headers.ts";
 import { V1_VERIFIERS } from "../provenance/index.ts";
-import { loadMasterKeys, unwrapEnvironmentDek } from "../vault/keys.ts";
-import type { UnwrappedEnvironmentDek } from "../vault/keys.ts";
 import { BootSessionCore } from "./boot-session-core.ts";
 import type {
   ApproveBootInput,
+  CompleteBootApprovalInput,
+  PrepareBootApprovalResult,
   BootActionResult,
   BootConnection,
   BootIdentity,
@@ -31,7 +31,8 @@ import { fromSqlStorage } from "./boot-storage.ts";
  *
  * The class is deliberately thin. It wires the Cloudflare runtime into
  * `BootSessionCore`: SQLite storage, the hibernating WebSocket API, alarms, the
- * D1 binding and the master keyring. Every rule lives in the core, which is why
+ * D1 binding. Key release runs in the control plane; this object receives only
+ * an encrypted envelope. Every rule lives in the core, which is why
  * the tests can drive the same code over `node:sqlite`.
  *
  * Nothing here keeps state in instance fields between requests. A hibernated
@@ -86,8 +87,6 @@ export class EnvironmentSessionDO extends DurableObject<Env> {
       newBootId: () => generatePrefixedUlid("boot"),
       newAuditId: () => generatePrefixedUlid("aud"),
       randomChallenge: () => generateResumeChallenge(),
-      unwrapDek: async (id: string): Promise<UnwrappedEnvironmentDek> =>
-        await unwrapEnvironmentDek(db, loadMasterKeys(this.env), id),
       sockets: {
         forBoot: (bootId: string): readonly BootSocket[] => this.#socketsFor(bootId),
       },
@@ -206,8 +205,12 @@ export class EnvironmentSessionDO extends DurableObject<Env> {
 
   // ------------------------------------------------------------------ RPCs
 
-  async approve(input: ApproveBootInput): Promise<BootActionResult> {
-    return await this.#core(this.#environmentId()).approve(input);
+  async prepareApproval(input: ApproveBootInput): Promise<PrepareBootApprovalResult> {
+    return await this.#core(this.#environmentId()).prepareApproval(input);
+  }
+
+  async completeApproval(input: CompleteBootApprovalInput): Promise<BootActionResult> {
+    return await this.#core(this.#environmentId()).completeApproval(input);
   }
 
   async decline(input: DeclineBootInput): Promise<BootActionResult> {

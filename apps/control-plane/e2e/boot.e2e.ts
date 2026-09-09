@@ -28,6 +28,9 @@ const REPO_ROOT = dirname(dirname(APP_DIRECTORY));
 const GO_CLIENT_DIRECTORY = join(REPO_ROOT, "apps", "env-client");
 const VP = join(REPO_ROOT, "node_modules", ".bin", "vp");
 const WRANGLER = join(APP_DIRECTORY, "node_modules", ".bin", "wrangler");
+// Fresh state per run: WIP schema changes must not mutate a developer's vault.
+const WORKSPACE = await mkdtemp(join(tmpdir(), "keevault-e2e-"));
+const STATE_DIRECTORY = join(WORKSPACE, "state");
 
 /** How long the dev server may take to answer its first request. */
 const DEV_READY_TIMEOUT_MS = 180_000;
@@ -210,7 +213,12 @@ async function startDevServer(secret: string): Promise<DevServer> {
   const child: ChildProcess = spawn(VP, ["dev", "--port", String(port)], {
     cwd: APP_DIRECTORY,
     detached: true,
-    env: { ...processEnv, VAULT_E2E: "1", VAULT_E2E_SECRET: secret },
+    env: {
+      ...processEnv,
+      VAULT_E2E: "1",
+      VAULT_E2E_SECRET: secret,
+      VAULT_E2E_STATE_DIR: STATE_DIRECTORY,
+    },
   });
   let log = "";
   child.stdout?.on("data", (chunk: Buffer) => {
@@ -449,7 +457,17 @@ async function auditTrace(bootId: string): Promise<string[]> {
 async function d1(sql: string): Promise<string> {
   const result = await mustRun(
     WRANGLER,
-    ["d1", "execute", "VAULT_DB", "--local", "--json", "--command", sql],
+    [
+      "d1",
+      "execute",
+      "VAULT_DB",
+      "--local",
+      "--persist-to",
+      STATE_DIRECTORY,
+      "--json",
+      "--command",
+      sql,
+    ],
     APP_DIRECTORY,
     "wrangler d1 execute",
   );
@@ -629,20 +647,19 @@ async function main(): Promise<number> {
   say("Applying local D1 migrations");
   await mustRun(
     WRANGLER,
-    ["d1", "migrations", "apply", "VAULT_DB", "--local"],
+    ["d1", "migrations", "apply", "VAULT_DB", "--local", "--persist-to", STATE_DIRECTORY],
     APP_DIRECTORY,
     "vault migrations",
   );
   await mustRun(
     WRANGLER,
-    ["d1", "migrations", "apply", "AUTH_DB", "--local"],
+    ["d1", "migrations", "apply", "AUTH_DB", "--local", "--persist-to", STATE_DIRECTORY],
     APP_DIRECTORY,
     "auth migrations",
   );
 
   say("Building the Go client");
-  const workspace = await mkdtemp(join(tmpdir(), "keevault-e2e-"));
-  const binary = join(workspace, "keevault");
+  const binary = join(WORKSPACE, "keevault");
   await mustRun("go", ["build", "-o", binary, "."], GO_CLIENT_DIRECTORY, "go build");
 
   say("Starting the dev server with VAULT_E2E=1");
@@ -661,11 +678,10 @@ async function main(): Promise<number> {
     say(dev.log().slice(-4000));
   } finally {
     await dev.stop();
-    await rm(workspace, { recursive: true, force: true });
   }
 
   say(failures === 0 ? "\nAll scenarios passed." : `\n${String(failures)} check(s) failed.`);
   return failures === 0 ? 0 : 1;
 }
 
-exit(await main());
+exit(await main().finally(async () => await rm(WORKSPACE, { recursive: true, force: true })));
