@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Check,
   CheckCheck,
-  ChevronRight,
   Code2,
   Database,
   Fingerprint,
@@ -16,6 +15,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { MarketingButton } from "@/components/marketing/button";
+import { MarketingHeader, MarketingFooter } from "@/components/marketing/navigation";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -37,26 +37,7 @@ function MarketingPage() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <header className="site-header page-width">
-        <a href="/" className="wordmark" aria-label="keevault home">
-          <span className="brand-icon">
-            <LockKeyhole aria-hidden="true" />
-          </span>
-          keevault<span className="wordmark-period">.</span>
-        </a>
-        <nav aria-label="Main navigation" className="header-nav">
-          <a href="#how-it-works">How it works</a>
-          <a href="#security">Security</a>
-          <a href="/docs">
-            Docs <ChevronRight aria-hidden="true" />
-          </a>
-        </nav>
-        <MarketingButton asChild size="sm">
-          <a href="/docs/getting-started">
-            Get started <ArrowRight data-icon="inline-end" />
-          </a>
-        </MarketingButton>
-      </header>
+      <MarketingHeader />
       <main id="main">
         <section className="hero page-width" aria-labelledby="hero-title">
           <div className="hero-copy">
@@ -313,19 +294,7 @@ function MarketingPage() {
           </MarketingButton>
         </section>
       </main>
-      <footer className="site-footer page-width">
-        <a href="/" className="wordmark">
-          <span className="brand-icon">
-            <LockKeyhole aria-hidden="true" />
-          </span>
-          keevault<span className="wordmark-period">.</span>
-        </a>
-        <p>Always free.</p>
-        <nav aria-label="Footer navigation">
-          <a href="/docs">Documentation</a>
-          <a href="/docs/security">Security guide</a>
-        </nav>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 }

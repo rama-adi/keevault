@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from "./routes/__root";
 import { Route as IndexRouteImport } from "./routes/index";
 import { Route as DocsSplatRouteImport } from "./routes/docs/$";
+import { Route as PricingPageRouteImport } from "./routes/pricing/page";
 import { Route as ApiSearchPageRouteImport } from "./routes/api/search/page";
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const DocsSplatRoute = DocsSplatRouteImport.update({
   path: "/docs/$",
   getParentRoute: () => rootRouteImport,
 } as any);
+const PricingPageRoute = PricingPageRouteImport.update({
+  id: "/pricing/",
+  path: "/pricing/",
+  getParentRoute: () => rootRouteImport,
+} as any);
 const ApiSearchPageRoute = ApiSearchPageRouteImport.update({
   id: "/api/search/",
   path: "/api/search/",
@@ -31,30 +37,34 @@ const ApiSearchPageRoute = ApiSearchPageRouteImport.update({
 
 export interface FileRoutesByFullPath {
   "/": typeof IndexRoute;
+  "/pricing/": typeof PricingPageRoute;
   "/docs/$": typeof DocsSplatRoute;
   "/api/search/": typeof ApiSearchPageRoute;
 }
 export interface FileRoutesByTo {
   "/": typeof IndexRoute;
+  "/pricing": typeof PricingPageRoute;
   "/docs/$": typeof DocsSplatRoute;
   "/api/search": typeof ApiSearchPageRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   "/": typeof IndexRoute;
+  "/pricing/": typeof PricingPageRoute;
   "/docs/$": typeof DocsSplatRoute;
   "/api/search/": typeof ApiSearchPageRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: "/" | "/docs/$" | "/api/search/";
+  fullPaths: "/" | "/pricing/" | "/docs/$" | "/api/search/";
   fileRoutesByTo: FileRoutesByTo;
-  to: "/" | "/docs/$" | "/api/search";
-  id: "__root__" | "/" | "/docs/$" | "/api/search/";
+  to: "/" | "/pricing" | "/docs/$" | "/api/search";
+  id: "__root__" | "/" | "/pricing/" | "/docs/$" | "/api/search/";
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  PricingPageRoute: typeof PricingPageRoute;
   DocsSplatRoute: typeof DocsSplatRoute;
   ApiSearchPageRoute: typeof ApiSearchPageRoute;
 }
@@ -75,6 +85,13 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof DocsSplatRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    "/pricing/": {
+      id: "/pricing/";
+      path: "/pricing";
+      fullPath: "/pricing/";
+      preLoaderRoute: typeof PricingPageRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     "/api/search/": {
       id: "/api/search/";
       path: "/api/search";
@@ -87,6 +104,7 @@ declare module "@tanstack/react-router" {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PricingPageRoute: PricingPageRoute,
   DocsSplatRoute: DocsSplatRoute,
   ApiSearchPageRoute: ApiSearchPageRoute,
 };
