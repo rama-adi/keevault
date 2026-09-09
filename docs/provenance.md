@@ -6,7 +6,7 @@ Spec sections 24 through 29 define six distinct objects. The vault keeps them se
 
 Claims are what the workload itself says about itself: repository, commit, OCI repository, digest, deployment ID, provider name. A workload supplies claims in the `claims` field of `boot.hello`. Claims are untrusted by definition. Nothing in the system treats a claim as true until a verifier confirms it.
 
-Evidence is material a verifier can check: a signed build manifest, an OCI registry response, a GitHub Artifact Attestation, a Sigstore or in-toto statement, Zeabur build metadata. A workload supplies evidence in the `evidence` array of `boot.hello`, alongside its claims.
+Evidence is material a verifier can check. V1 implements `claims-only` and `signed-build-manifest-v1`; it does not implement OCI registry, GitHub Artifact Attestation, Sigstore, or provider-attestation adapters. A workload supplies evidence in the `evidence` array of `boot.hello`, alongside its claims.
 
 Verifier adapters take claims and evidence for one environment and return a normalized verification result. Each verifier is independent and interface-driven, so a new evidence source only requires a new adapter, not a change to the approval flow.
 
@@ -20,12 +20,12 @@ Human decision is the administrator approving or declining a boot on the approva
 
 Every verifier returns one of four statuses, per spec section 25.
 
-| Status        | What it means to an approver                                                                                                                                                                                     |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VERIFIED`    | The evidence supplied was checked and it validates. The stated fact, for example that this commit produced this OCI digest, is confirmed by a trusted signer.                                                    |
-| `UNVERIFIED`  | No cryptographic evidence was available to check. The claim is displayed as information only. This is the claims-only verifier's permanent output, since it merely normalizes what the workload said.            |
-| `FAILED`      | Cryptographic evidence was supplied but did not validate. This must be shown as a clear failure, not a subtle warning, per spec section 34: `SIGNATURE VERIFICATION FAILED`.                                     |
-| `UNAVAILABLE` | This provider or evidence type has no cryptographic attestation to offer at all. This is distinct from `FAILED`. `UNAVAILABLE` means nothing was checked. `FAILED` means something was checked and it was wrong. |
+| Status        | What it means to an approver                                                                                                                                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VERIFIED`    | The evidence supplied was checked and it validates. The stated fact, for example that this commit produced this OCI digest, is confirmed by a trusted signer.                                         |
+| `UNVERIFIED`  | No cryptographic evidence was available to check. The claim is displayed as information only. This is the claims-only verifier's permanent output, since it merely normalizes what the workload said. |
+| `FAILED`      | Cryptographic evidence was supplied but did not validate. This must be shown as a clear failure, not a subtle warning, per spec section 34: `SIGNATURE VERIFICATION FAILED`.                          |
+| `UNAVAILABLE` | The verifier has no supported evidence to check for this request. This is distinct from `FAILED`. `UNAVAILABLE` means nothing was checked. `FAILED` means something was checked and it was wrong.     |
 
 The dashboard must show these four statuses distinctly. Rendering `UNAVAILABLE` and `FAILED` the same way would hide an actual signature failure behind a merely-missing-evidence look.
 
@@ -37,7 +37,9 @@ Each environment selects one policy, per spec section 26.
 
 `ADVISORY` means every configured verifier runs and its result is displayed prominently, but an administrator may approve despite missing or unverified provenance. This is the recommended default for native Zeabur builds, since a native Zeabur Git build has no cryptographic build evidence to offer.
 
-`REQUIRED` means the Approve button stays disabled until the configured required verification conditions succeed. For example, an environment might require `repository = github.com/acme/foo`, `OCI repository = ghcr.io/acme/foo`, and `signed-build-manifest-v1 = VERIFIED` all at once before approval is possible.
+`REQUIRED` blocks approval unless each enabled required verifier reports `VERIFIED` and none of its facts contradicts a workload claim. With no enabled required policy rows, it requires at least one `VERIFIED` result, no `FAILED` result, and no mismatched fact. The current evaluator does not enforce repository or digest allow lists from policy configuration. The dashboard edits the mode, not per-verifier rules.
+
+Approval reruns verification and checks the evidence-summary digest the operator viewed. A changed result requires review again.
 
 ## The signed-build-manifest-v1 format
 
@@ -141,6 +143,6 @@ Runtime image identity     CLAIMED / not remotely attested
 
 ## Build provenance is not runtime attestation
 
-That exact dashboard wording, `Runtime image identity CLAIMED / not remotely attested`, is deliberate. Build provenance answers what was built: a trusted signer says this commit produced this OCI digest. It does not answer what is currently running. Nothing in V1 remotely confirms that the process currently connected to the bootstrap WebSocket is executing that exact image.
+The dashboard displays "Running OCI identity: not independently attested". Build provenance answers what was built: a trusted signer says this commit produced this OCI digest. It does not answer what is currently running. Nothing in V1 remotely confirms that the process currently connected to the bootstrap WebSocket is executing that exact image.
 
 Spec section 50 keeps these as separate objects: workload claims, provenance, and runtime attestation. Runtime attestation is explicitly optional and not generally available in V1. V2 may add provider-issued OIDC, signed deployment identity, or hardware attestation to close this gap, but V1 does not attempt it. A `VERIFIED` build-provenance status must never be presented or read as proof of what is executing right now.

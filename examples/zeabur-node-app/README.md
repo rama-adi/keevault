@@ -3,8 +3,8 @@
 This is a minimal, dependency-free Node app that shows how to run a workload
 behind keevault's bootstrap client on Zeabur. `server.js` listens on `PORT`,
 answers `GET /healthz` with `200 ok`, and answers `GET /` with a JSON object
-listing the names (never the values) of every environment variable starting
-with `APP_`, plus the process uptime.
+listing the names of every environment variable starting
+with `APP_`, plus the process uptime. It never returns their values.
 
 The Dockerfile downloads a released static `keevault` binary from R2 and verifies
 its SHA-256 against the build argument you supply. It contains no Go build stage.
@@ -12,7 +12,7 @@ The entrypoint reads `keevault.json` and launches `node server.js` after approva
 
 ## Building
 
-Publish a release using `docs/releases.md`, then copy its trusted checksums into
+From the repository root, publish a release using [the release guide](../../docs/releases.md), then copy its trusted checksums into
 your build configuration. Replace these placeholders before running:
 
 ```bash
@@ -41,7 +41,7 @@ token for one environment:
 ```bash
 docker run --rm -p 3000:3000 \
   -e VAULT_URL=https://your-dev-vault.example.com \
-  -e VAULT_BOOTSTRAP_TOKEN=vlt_boot_<id>.<secret> \
+  -e VAULT_BOOTSTRAP_TOKEN='vlt_boot_<id>.<secret>' \
   zeabur-node-app-example
 ```
 
@@ -54,13 +54,17 @@ approves the boot on the dashboard. This is expected: see "Readiness" below.
 Set these as Zeabur environment variables on the service, not as build
 arguments and not in the image:
 
-| Variable                | Required | Meaning                                                      |
-| ----------------------- | -------- | ------------------------------------------------------------ |
-| `VAULT_URL`             | yes      | The keevault control plane endpoint.                         |
-| `VAULT_BOOTSTRAP_TOKEN` | yes      | The bootstrap token for this environment.                    |
-| `VAULT_GIT_REPOSITORY`  | no       | Git repository claim. Zeabur exposes this as build metadata. |
-| `VAULT_GIT_COMMIT`      | no       | Git commit claim. Zeabur exposes this as build metadata.     |
-| `VAULT_DEPLOYMENT_ID`   | no       | Zeabur deployment id, sent as a provider claim.              |
+| Variable                | Required | Meaning                                                     |
+| ----------------------- | -------- | ----------------------------------------------------------- |
+| `VAULT_URL`             | yes      | The keevault control plane endpoint.                        |
+| `VAULT_BOOTSTRAP_TOKEN` | yes      | The bootstrap token for this environment.                   |
+| `VAULT_GIT_REPOSITORY`  | no       | Git repository claim; set together with `VAULT_GIT_COMMIT`. |
+| `VAULT_GIT_COMMIT`      | no       | Git commit claim; set together with `VAULT_GIT_REPOSITORY`. |
+| `VAULT_DEPLOYMENT_ID`   | no       | Zeabur deployment id, sent as a provider claim.             |
+
+Keevault does not read Zeabur metadata variables automatically. Map the values
+you want to send into the `VAULT_*` variables above. See
+[Zeabur's variable reference](https://zeabur.com/docs/en-US/deploy/config/environment-variables).
 
 Claims are untrusted workload input. The vault shows them to the approver for
 comparison against verified facts; it never uses a claim to choose an
@@ -77,8 +81,12 @@ be `ADVISORY`.
 
 **Prebuilt OCI deployment.** Your own CI builds and signs the image, pushes it
 to a registry with an immutable digest, and Zeabur is configured to pull that
-image rather than build it. The signed build manifest becomes evidence in
-`boot.hello`, so the dashboard can show verified Git-to-OCI provenance. This
+image rather than build it. Provide a JSON evidence array through
+`VAULT_EVIDENCE_FILE`, including a
+`signed-build-manifest-v1` item signed by a trusted key configured in the control
+plane. Also set matching `VAULT_OCI_REPOSITORY` and `VAULT_OCI_DIGEST` claims.
+The client sends the file as evidence in `boot.hello`, so the dashboard can show
+verified Git-to-OCI provenance. This
 is the preferred path for an environment with policy `REQUIRED`. Even here,
 "build provenance verified" does not mean "this exact process was remotely
 attested at runtime": the image identity is claimed by the deployment, not
@@ -86,14 +94,23 @@ attested by Zeabur.
 
 ## Readiness caveat (spec section 33)
 
-Human approval means this container can sit in startup for a long time: from
-a few seconds to the length of the pending-approval TTL. Zeabur's health
-check and rolling-deployment behavior keeps the previous healthy deployment
-running until the replacement passes its health check, so the container must
-never fake readiness to keep a deployment alive. This image does not: node
-does not start, and therefore `/healthz` does not answer, until
-keevault execs into it after a successful, decrypted approval.
+Human approval can leave the container waiting until either the server boot TTL
+or the client's session timeout expires. The client defaults to 30 minutes.
+Node starts only after successful decryption and server acknowledgement, so
+`/healthz` does not answer while approval is pending.
 
-Before calling this integration production-ready, run the test matrix in
-`docs/zeabur.md`, including how long Zeabur will wait for a deployment stuck
-in "waiting for approval" before it gives up.
+Zeabur documents TCP readiness checks by default. Configure `/healthz` in the
+service's health-check settings to test the HTTP endpoint. The example image's
+Docker `HEALTHCHECK` polls port 3000; keep `PORT=3000` when using that check, or
+update its target when changing ports. Do not assume the Docker health check
+configures Zeabur's probe.
+
+For services without volumes, Zeabur documents keeping the previous deployment
+active until the replacement passes its health check. Services with volumes use
+a recreate strategy, stopping the old deployment first. See
+[Zeabur health checks](https://zeabur.com/docs/en-US/operations/monitoring/health-checks).
+
+Before calling this integration production-ready, run the
+[test matrix](../../docs/zeabur.md), including how long Zeabur waits for approval
+before it marks a deployment failed. Provider behavior remains unverified by
+this repository's tests.

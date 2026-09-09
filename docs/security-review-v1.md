@@ -1,5 +1,7 @@
 # Security review, V1
 
+This is the historical V1 review and its original follow-up notes. It is not a current launch sign-off. The [2026-09-09 audit](audit-2026-09-09.md) found additional secret-write and setup-session issues, now fixed, plus unresolved initial-owner creation and key-rotation races. Its current findings qualify the conclusions and launch criteria below. Browser, live-runtime, backup, and deployment checks remain unverified unless a later report records their results.
+
 Reviewed against docs/product-specs.md sections 3, 11 to 18, 20, 22, 35 to 38, 41, 43 phase 11, 44 and 47, plus docs/threat-model.md and protocol/websocket-v1.md. Code read: packages/crypto/src, packages/protocol/src, apps/control-plane/src/server (auth, bootstrap, durable-objects, provenance, vault, functions, log.ts, worker.ts), apps/control-plane/src/routes/boots, apps/env-client/internal.
 
 Findings 1 to 8 have since been fixed in this repository. Each finding below carries a "Fixed" note saying what changed and which test proves it, and every test that was written to fail against a finding now passes as an ordinary test. Finding 9 is informational and still open.

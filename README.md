@@ -82,17 +82,18 @@ your bucket, public download domain, and CI credentials before the first release
 
 ## Quick start for developers
 
-Install dependencies and Vite+ tool versions:
+Run these commands from the repository root. Install dependencies and build the
+workspace packages, whose exports point to generated `dist` files:
 
 ```bash
 vp install
+vp run -r build
 ```
 
 Copy the local secrets file and fill in three independent random values:
 
 ```bash
-cd apps/control-plane
-cp .dev.vars.example .dev.vars
+cp apps/control-plane/.dev.vars.example apps/control-plane/.dev.vars
 ```
 
 `.dev.vars.example` lists the exact generation command for each of `VAULT_MASTER_KEY_V1`, `BETTER_AUTH_SECRET`, and `VAULT_SETUP_TOKEN`. Do not derive one from another, and never commit `.dev.vars`.
@@ -100,7 +101,7 @@ cp .dev.vars.example .dev.vars
 Apply the local D1 migrations:
 
 ```bash
-pnpm run db:migrate:local
+vp run control-plane#db:migrate:local
 ```
 
 Start the dashboard:
@@ -113,10 +114,11 @@ Run the checks and tests:
 
 ```bash
 vp check
+vp test
 vp run -r test
 ```
 
-`vp check` formats, lints, and type-checks. `vp run -r test` runs every package's Vitest suite across the workspace. Run the Go client's tests separately:
+`vp check` checks formatting, lint, and types. Use `vp check --fix` to apply formatting fixes. `vp run -r test` runs every package's Vitest suite across the workspace. Run the Go client's tests separately:
 
 ```bash
 cd apps/env-client
@@ -127,7 +129,6 @@ go test ./...
 ## Further reading
 
 - [Latest code audit](docs/audit-2026-09-09.md) covers fixes and remaining rotation and setup concurrency risks.
-
 - `docs/README.md` is the index into every document below, ordered for a new operator.
 - `docs/architecture.md` covers components, request paths, the key hierarchy, and the boot state machine.
 - `docs/operations.md` is the deployment runbook, from creating the D1 databases to rotating keys.

@@ -6,9 +6,9 @@ Each runbook below covers detect, contain, eradicate, recover, and what to write
 
 **Detect.** Watch for `boot.requested` events from an unfamiliar source IP against a token's environment, a spike in the `invalid token attempts` or `CIDR failures` metrics, or a report that a token value appeared in a public repository, log, or chat.
 
-**Contain.** Revoke the token immediately by setting `bootstrap_tokens.revoked_at`. Revocation, per spec section 38, prevents new WebSockets, prevents reconnect, and cancels every `PENDING` request from that token. Cancel `APPROVED` but not yet delivered requests from that token as well, since the safest V1 behavior is fail closed. Requests already `CONSUMED` cannot be revoked retroactively, since that workload already holds its environment values.
+**Contain.** Revoke the token through the dashboard so the service updates `bootstrap_tokens.revoked_at` and requests Durable Object cancellation. A direct database update does not perform that cancellation. Check for `bootstrap-token.revoked.cancel-failed` and confirm every live boot is canceled. Revocation, per spec section 38, prevents new WebSockets, prevents reconnect, and cancels every `PENDING` request from that token. Cancel `APPROVED` but not yet delivered requests from that token as well, since the safest V1 behavior is fail closed. Requests already `CONSUMED` cannot be revoked retroactively, since that workload already holds its environment values.
 
-**Eradicate.** Issue a new bootstrap token for the affected environment and update the deployment's `VAULT_BOOTSTRAP_TOKEN` configuration. Confirm the old token's `token_hash` can no longer authenticate by checking `revoked_at` is set and attempting a WebSocket upgrade with the old value returns close code 4403.
+**Eradicate.** Issue a new bootstrap token for the affected environment and update the deployment's `VAULT_BOOTSTRAP_TOKEN` configuration. Confirm the old token's `token_hash` can no longer authenticate by checking `revoked_at` is set and attempting a WebSocket upgrade with the old value returns HTTP 403 before upgrade, corresponding to protocol code 4403.
 
 **Recover.** Confirm the legitimate workload reconnects and completes a fresh boot against the new token. Confirm any workload still holding the old token fails closed rather than retrying indefinitely.
 
@@ -18,7 +18,7 @@ Each runbook below covers detect, contain, eradicate, recover, and what to write
 
 **Detect.** This usually surfaces externally, through a cloud storage misconfiguration report, a backup-access audit, or a Cloudflare account compromise notice. There is no in-vault signal for a passive export leak, since reading a backup does not touch the live system.
 
-**Contain.** Confirm the master key was not also exposed. If the master key is intact, the exported ciphertext, wrapped keys, and token hashes are useless to the attacker. Rotate any bootstrap token whose plaintext might have been reconstructable from other leaked material, though `token_hash` alone does not allow that.
+**Contain.** Confirm the master key was not also exposed. If the master key is intact, the exported ciphertext and wrapped keys do not expose plaintext values by themselves. The export still exposes metadata such as secret names, project names, and audit history. Rotate any bootstrap token whose plaintext might have been reconstructable from other leaked material, though `token_hash` alone does not allow that.
 
 **Eradicate.** Fix the access-control gap that allowed the export to leak, whether that is a storage bucket permission, an over-broad Cloudflare API token, or a compromised backup credential.
 
@@ -30,7 +30,7 @@ Each runbook below covers detect, contain, eradicate, recover, and what to write
 
 **Detect.** A report that an image was pushed to a public registry by mistake, or that a Zeabur environment-variable dump was pasted somewhere it should not have been.
 
-**Contain.** The Docker image itself contains no plaintext environment values and no long-term decryption keys, per spec section 3, so the image leak alone is not a secrets leak. If the leak includes `VAULT_BOOTSTRAP_TOKEN` from the Zeabur dump, treat this as the leaked bootstrap token runbook above and revoke that token immediately.
+**Contain.** The intended image build contains no plaintext vault values or long-term decryption keys. Inspect the actual image layers and build inputs before concluding an image leak exposed no secrets; the repository has no automated image-layer scan. If the leak includes `VAULT_BOOTSTRAP_TOKEN` from the Zeabur dump, treat this as the leaked bootstrap token runbook above and revoke that token immediately.
 
 **Eradicate.** Remove the leaked image from any public registry it reached. Rotate the leaked token per the runbook above.
 
@@ -44,7 +44,7 @@ Each runbook below covers detect, contain, eradicate, recover, and what to write
 
 **Contain.** Cancel any `PENDING` or `APPROVED` boot request for the affected environment to prevent further delivery under the exposed key while rotation is prepared.
 
-**Eradicate.** Run the environment key rotation runbook in `docs/key-rotation.md`. This decrypts and re-encrypts every secret under a new environment key, which invalidates the exposed key for any future use.
+**Eradicate.** Run the environment key rotation runbook in `docs/key-rotation.md`. Pause competing writes and rotations as required by that runbook. Re-encryption protects new ciphertext but does not invalidate copied old ciphertext or a plaintext value already obtained. Rotate the actual application credentials at their issuing services, then store their replacements in the vault.
 
 **Recover.** Confirm every secret's `env_key_version` reflects the new version, per the verification queries in that runbook. Confirm any legitimate workload reconnecting after rotation receives the new environment key version.
 
@@ -58,7 +58,7 @@ Each runbook below covers detect, contain, eradicate, recover, and what to write
 
 **Eradicate.** Require the account owner to register a new passkey from a trusted device before restoring access. Review `audit_events` for every action taken under that account's session during the suspected compromise window, specifically `secret.updated`, `secret.deleted`, `bootstrap-token.created`, `provenance-policy.changed`, `trusted-signer.added`, and any `boot.approved` event.
 
-**Recover.** For any `boot.approved` event found during the compromise window that the legitimate owner did not intend, treat the corresponding boot as compromised. If it already reached `CONSUMED`, treat the delivered environment as exposed and rotate that environment's key per the runbook above. If it has not yet been delivered, cancel it.
+**Recover.** For any `boot.approved` event found during the compromise window that the legitimate owner did not intend, treat the corresponding boot as compromised. If it already reached `CONSUMED`, treat the delivered values as exposed, rotate the application credentials at their issuing services, and follow the environment-key runbook above. If it has not yet been delivered, cancel it.
 
 **Contain, further.** If the account is an owner and no other owner exists, do not lock the account out without first confirming another owner or the emergency operator procedure below is available, since owner-only actions include rotating project and environment keys and managing administrators.
 
@@ -70,7 +70,7 @@ This is the emergency operator procedure from spec section 41. Better Auth harde
 
 **Detect.** The sole owner reports losing their passkey device with no other registered credential and no other owner account.
 
-**Contain.** Confirm no other owner or admin account exists that could instead be promoted, since promoting an existing admin to owner is preferable to an out-of-band recovery.
+**Contain.** Check for another accessible owner account. Only an owner can promote an admin in the dashboard; an admin alone cannot recover a lost owner through that action.
 
 **Eradicate.** There is no in-product self-service reset for this case, since public signup and unauthenticated recovery are both disabled by design. Recovery requires an operator with direct access to the Cloudflare account and D1 database to perform a manual credential reset for the affected Better Auth user record, following whatever manual procedure the operator has documented outside the dashboard. Decide before launch exactly what that manual procedure is and who is authorized to run it, since the brief and the spec do not define its mechanics.
 

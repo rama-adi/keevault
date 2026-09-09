@@ -27,12 +27,14 @@ Create a GitHub environment named `releases`. Configure these values there:
 
 Protect release tags and restrict who can publish to this environment. No R2
 credentials belong in Docker build arguments, workload variables, or the repo.
-This change only supplies the workflow; it does not create a bucket or upload a
-release.
+The workflow does not provision the bucket, credentials, or public domain.
 
 ## Publish
 
-Push a version tag such as `v1.0.0`. `.github/workflows/release-client.yml` runs Go
+Push a version tag such as `v1.0.0`. Publication accepts `vMAJOR.MINOR.PATCH`
+with an optional prerelease suffix containing letters, digits, dots, or hyphens.
+Build metadata with `+` is not accepted. Other tags starting with `v` still trigger
+the build job but fail version validation in the publish job. `.github/workflows/release-client.yml` runs Go
 vet and tests, builds static Linux amd64 and arm64 clients, and retains them as
 a GitHub Actions artifact before publishing to R2:
 
@@ -47,7 +49,9 @@ upload therefore needs operator cleanup before retrying, or a new version tag.
 This check prevents routine overwrites; bucket access policies still control
 other writers. Never move a published tag or replace its binaries.
 
-To build and inspect artifacts locally without publishing:
+To build and inspect artifacts locally without publishing, run from the repository
+root with Go 1.26 or newer. This script builds binaries and checksums; it does
+not run vet or tests:
 
 ```bash
 bash scripts/build-release.sh
@@ -69,5 +73,6 @@ trust in the original build; protect CI and review releases before pinning.
 
 The image build fails for missing checksums, unknown architectures, non-HTTPS
 URLs, malformed versions, failed downloads, or checksum mismatches. The final
-image contains the client and Node app; it contains no downloader or compiler
-from the download stage.
+image copies only the client binary from the download stage alongside the Node
+app. The Node base image still supplies its own utilities, including the `wget`
+used by the Docker health check.

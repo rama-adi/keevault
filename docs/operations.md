@@ -71,7 +71,7 @@ Save an offline copy of `VAULT_MASTER_KEY_V1` before continuing. See "back up th
 ### 4. Apply remote migrations
 
 ```bash
-pnpm run db:migrate:remote
+vp run db:migrate:remote
 ```
 
 This runs `wrangler d1 migrations apply VAULT_DB --remote` and `wrangler d1 migrations apply AUTH_DB --remote` in sequence, applying `migrations/vault/0001_init.sql` and `migrations/auth/0001_better_auth.sql`.
@@ -79,8 +79,7 @@ This runs `wrangler d1 migrations apply VAULT_DB --remote` and `wrangler d1 migr
 ### 5. Deploy
 
 ```bash
-pnpm run build
-wrangler deploy -c dist/server/wrangler.json
+vp run deploy
 ```
 
 ### 6. Run the first-owner ceremony at /setup
@@ -91,11 +90,11 @@ Fill in the setup token you generated in step 2, a name, and an email. The form 
 
 ### 7. Register the passkey
 
-Immediately after the owner account is created, the setup page prompts a passkey registration through `authClient.passkey.addPasskey`. Complete it. If this step fails after the account was created, sign-in is impossible until a passkey exists, since the vault has no password fallback; the documented recovery in that case is to recreate the auth database and run setup again.
+Immediately after the owner account is created, the setup page prompts a passkey registration through `authClient.passkey.addPasskey`. Complete it. If this step fails after the account was created, sign-in is impossible until a passkey exists, since the vault has no password fallback; the current product has no supported recovery flow. Preserve the setup session while investigating enrollment failure. Recreating the auth database destroys all users, sessions, and passkeys; do not treat that as routine recovery for an established deployment. See [incident response](incident-response.md). After enrollment, complete a passkey sign-in to obtain step-up authority; setup and registration alone do not grant it.
 
-### 8. Setup closes itself, nothing else to disable
+### 8. Verify enrollment and remove the setup token
 
-Once the first user row exists, `/setup` returns 404 unconditionally. There is no separate flag to disable and no second step to remember: the ceremony is gated purely on `ownerExists()`, which checks whether the user table is empty.
+Once the first user row exists, `/setup` returns 404 unconditionally. The check and account creation are not atomic, so concurrent requests with a valid token can create multiple owners. Use one setup request, verify the expected user exists, and remove `VAULT_SETUP_TOKEN` with `wrangler secret delete VAULT_SETUP_TOKEN` after enrollment. This limits setup exposure but does not fix the race described in [the audit](audit-2026-09-09.md).
 
 ### 9. Back up the master key offline
 
@@ -109,7 +108,7 @@ On the dashboard, `/projects` lists projects and, for an admin or owner, offers 
 
 ### Add secrets or import a .env file
 
-Open an environment at `/projects/$projectId/environments/$environmentId` and use the Secrets tab. Adding a secret encrypts the value in the Worker before it reaches D1. Importing a `.env` file sends its plaintext over HTTPS to the Worker, which parses it, encrypts each value independently, and discards the plaintext; the dashboard never returns a value once stored; see `docs/dashboard.md` for what the secrets list looks like.
+Open an environment at `/projects/$projectId/environments/$environmentId` and use the Secrets tab. Adding a secret encrypts the value in the Worker before it reaches D1. Importing a `.env` file sends its plaintext over HTTPS to the Worker, which validates the complete input before encrypting and writing each value independently. A database or concurrent-write failure can leave earlier entries applied; the dashboard never returns a value once stored; see `docs/dashboard.md` for what the secrets list looks like.
 
 ### Create a bootstrap token and place it in Zeabur
 
@@ -129,19 +128,20 @@ On `/settings`, an owner can change any other administrator's role between `owne
 
 ### Rotate keys
 
-See `docs/key-rotation.md` for the three runbooks: environment key, project key, and master key. All three are owner-only, step-up-gated operations, reachable from the project or environment page.
+See `docs/key-rotation.md` for the three runbooks: environment key, project key, and master key. The dashboard implements environment and project rotations as owner-only actions with step-up. Master-key rewrap is a planned operator procedure with no implemented dashboard action or rewrap command. Pause competing writes before rotation because the current implementation has unresolved concurrency races.
 
 ### Revoke a token
 
-From the Tokens tab, revoke a token to set its `revoked_at`. Revocation immediately blocks new WebSocket connections and reconnects for that token and cancels every `PENDING` boot from it; `APPROVED` but not yet delivered boots are canceled too, since the safest behavior is to fail closed. A boot that already reached `CONSUMED` cannot be revoked retroactively, since that workload already holds its environment.
+From the Tokens tab, revoke a token to set its `revoked_at`. Revocation immediately blocks new WebSocket connections and reconnects for that token and attempts to cancel every live boot from it through its Durable Object. Check for `bootstrap-token.revoked.cancel-failed` and verify cancellation completed; `APPROVED` but not yet delivered boots are canceled too, since the safest behavior is to fail closed. A boot that already reached `CONSUMED` cannot be revoked retroactively, since that workload already holds its environment.
 
 ### Local development loop
 
 ```bash
 vp install
+vp run -r build
 cd apps/control-plane
 cp .dev.vars.example .dev.vars   # fill in the three secrets
-pnpm run db:migrate:local
+vp run db:migrate:local
 vp run dev
 ```
 

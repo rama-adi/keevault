@@ -12,7 +12,9 @@ Read these in order if you are operating keevault for the first time.
 8. **[zeabur.md](./zeabur.md)**. The Zeabur integration test matrix. Every row starts unrun until an operator runs it against a real Zeabur project.
 9. **[engineering-brief.md](./engineering-brief.md)**. The byte-level contract between the TypeScript and Go implementations, plus current implementation status.
 
-`security-review-v1.md`, when it exists in this directory, is maintained by a separate review workstream and is not covered by this index.
+[security-review-v1.md](./security-review-v1.md) records the earlier security review. Read it alongside the later audit below; historical conclusions do not override newer findings.
+
+[product-specs.md](./product-specs.md) describes the intended product and marks known implementation gaps. [Client configuration](../apps/env-client/README.md) documents the implemented launch settings.
 
 See [audit-2026-09-09.md](./audit-2026-09-09.md) for the latest review, fixes, and unresolved concurrency findings.
 

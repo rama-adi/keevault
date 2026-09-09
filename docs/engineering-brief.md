@@ -2,7 +2,7 @@
 
 ## Status
 
-This section reflects what the code and tests in this repository actually do, checked against the phase list in section 43 below. It does not run the Zeabur live test matrix in `docs/zeabur.md` or any browser-driven passkey UI test; both are checked by an operator against a real deployment, not by an automated suite, and every row in `docs/zeabur.md` still reads "not yet run".
+This section reflects what the code and tests in this repository actually do, checked against the phase list in section 43 of `docs/product-specs.md`. It does not run the Zeabur live test matrix in `docs/zeabur.md` or any browser-driven passkey UI test; both are checked by an operator against a real deployment, not by an automated suite, and the live Zeabur rows remain unrun.
 
 Implemented and covered by tests:
 
@@ -12,10 +12,17 @@ Implemented and covered by tests:
 - Phase 3, bootstrap authentication: token generation, hashing, CIDR checks, revocation, and expiry are implemented and tested in `bootstrap-auth.test.ts` and `keys.test.ts`.
 - Phase 4, Environment Durable Object: the boot state machine in `boot-session-core.ts` implements every state and transition in section 15, tested including hibernation and restart.
 - Phase 5, Go bootstrapper: `apps/env-client` implements the full client flow, including reconnect and resume proof, tested against a fake vault server in `fakevault_test.go`.
-- Phase 6, Better Auth dashboard auth: passkey-only login, the first-owner setup ceremony, and step-up authentication are implemented. Inviting a further administrator after setup is not implemented; `inviteAdmin` in `src/server/auth/setup.ts` is a stub that throws. Operators are added only by repeating the setup ceremony's account-creation path and are then promoted or demoted on `/settings`.
+- Phase 6, Better Auth dashboard auth: passkey-only login, the first-owner setup ceremony, and step-up authentication are implemented. Inviting a further administrator after setup is not implemented; `inviteAdmin` in `src/server/auth/setup.ts` is a stub that throws. Setup closes once any user exists. There is no supported invitation or additional-user creation flow; `/settings` can change roles only for existing users.
 - Phase 7, core dashboard: every page in section 43 exists (`/projects`, `/projects/$projectId`, the environment page's Secrets, Tokens, and Policy tabs, `/boots`, `/audit`, `/settings`). Secret reveal is correctly not implemented, matching the spec.
 - Phase 8, approval workflow: the Durable Object re-validates pending state, expiry, token validity, and policy before approving, so a stale dashboard read cannot authorize delivery.
 - Phase 9, provenance framework: the claims-only and signed-build-manifest-v1 verifiers are implemented, with trusted-signer management on the dashboard.
+
+Recent client and audit changes:
+
+- `keevault.json` configures `vaultUrl`, an expected `environmentId`, `requiredSecrets`, and command argv. The token still selects the environment; local checks run before acknowledgement. See [client configuration](../apps/env-client/README.md).
+- Release CI builds static Linux amd64 and arm64 binaries and can publish them to R2. The Docker example downloads a version and verifies a pinned checksum at image build time. R2 infrastructure and credentials must be configured before publication.
+- Secret writes reject stale versions, malformed CIDR policies fail closed, and setup sessions have no passkey step-up timestamp. Rotation/write concurrency and initial-owner claim atomicity remain unresolved. See [the audit](./audit-2026-09-09.md).
+- Local end-to-end tests passed for approval, reconnect, decline, and token revocation. These do not exercise Zeabur or browser passkey authentication.
 
 Implemented but not exercised against a live external system:
 
@@ -23,16 +30,18 @@ Implemented but not exercised against a live external system:
 
 Partially covered:
 
-- Phase 11, security testing: cryptographic tamper tests, authorization tests, and state-machine concurrency tests exist across `packages/crypto`, `packages/vault-store`, and `boot-session-core.test.ts`. No dedicated CSRF or session-fixation test suite was found, and no browser-driven WebAuthn or passkey UI test exists; step-up and passkey logic is covered only at the server-function level (`guards.ts`, `step-up.ts`), not through an automated browser flow. Treat both as not implemented for the purpose of the production launch criteria in section 47.
+- Phase 11, security testing: cryptographic tamper tests, authorization tests, and state-machine concurrency tests exist across `packages/crypto`, `packages/vault-store`, and `boot-session-core.test.ts`. No dedicated CSRF or session-fixation test suite was found, and no browser-driven WebAuthn or passkey UI test exists; step-up timing and session-path decisions are covered by `step-up-policy.test.ts`, not through an automated browser flow. Treat both as not implemented for the purpose of the production launch criteria in section 47.
 
 Not implemented in V1, called out where the spec would otherwise imply they exist:
 
-- Inviting a new administrator without repeating the full setup flow (section 21).
+- Inviting or creating an additional administrator after initial setup, section 21.
+- A master-key rewrap command or dashboard action. Adding a new master-key version does not migrate existing project-key rows.
+- Repository or digest allow lists in provenance policy configuration. The implemented evaluator checks verifier status and agreement with workload claims.
 - Any automated Zeabur or WebAuthn UI test run (section 43 phases 10 and 11, and the checklist in section 47).
 
 Repo: /Users/ramaadi/WorkProjects/env-vault (pnpm workspace managed by Vite+ `vp`).
-Product spec: docs/product-specs.md is authoritative for behaviour. This brief pins the exact encodings, layout and message shapes the spec leaves open, so the TypeScript and Go implementations agree byte for byte. Agents read this file before starting a work package.
-Repo conventions: CLAUDE.md (Vite+ usage, TanStack Start page/route rules, shadcn rules).
+Product spec: docs/product-specs.md describes intended behaviour; the status above and docs/audit-2026-09-09.md identify known implementation gaps. This brief pins the exact encodings, layout and message shapes the spec leaves open, so the TypeScript and Go implementations agree byte for byte. Agents read this file before starting a work package.
+Repo conventions: AGENTS.md (Vite+ usage, TanStack Start page/route rules, shadcn rules).
 
 ## Working rules for every agent
 
@@ -46,7 +55,7 @@ Repo conventions: CLAUDE.md (Vite+ usage, TanStack Start page/route rules, shadc
   - no `vi.mock` module mocking; inject dependencies instead.
   - no shape words in identifiers (`fooObj`, `barArr`, `bazStr`).
   - the rule `vite-plus/prefer-vite-plus-imports` requires importing `defineConfig` from "vite-plus" in vite.config.ts.
-- Go: `gofmt`, `go vet ./...`, `go test ./...` clean. Go 1.26 is installed. Stdlib crypto only (`crypto/ecdh`, `crypto/ed25519`, `crypto/aes`, `crypto/cipher`, `crypto/hkdf`, `crypto/sha256`). Only allowed third-party module: `github.com/coder/websocket`.
+- Go: `gofmt`, `go vet ./...`, `go test ./...` clean. Use the Go version specified in `apps/env-client/go.mod`. Stdlib crypto only (`crypto/ecdh`, `crypto/ed25519`, `crypto/aes`, `crypto/cipher`, `crypto/hkdf`, `crypto/sha256`). Only allowed third-party module: `github.com/coder/websocket`.
 - Never log or print secret material, tokens, keys, or plaintext secret values (spec §35-36). Tests may print nothing sensitive either.
 - Prose (docs, comments, README): plain, direct, sentence-case headings, no em dashes, no marketing words, no "leverage/robust/seamless/comprehensive". Say what the thing does and what the reader must do. See .agents/skills/unslop/SKILL.md.
 - When you are done, reply with: files created/changed, commands you ran and their final result (exact pass/fail), anything you could not finish and why, any decision you made that deviates from this brief.
@@ -72,9 +81,9 @@ examples/zeabur-node-app/    Dockerfile + tiny Node app for Phase 10
 docs/                        product-specs.md (given), plus threat-model.md, key-rotation.md, incident-response.md, provenance.md, architecture.md, operations.md, README index
 ```
 
-Workspace globs in pnpm-workspace.yaml: apps/_, packages/_, tools/*. Package names are scoped `@keevault/<name>`. Internal deps use `"workspace:*"`. Add third-party versions to the pnpm catalog when several packages share them.
+Workspace globs in pnpm-workspace.yaml: `apps/*`, `packages/*`, `tools/*`. Package names are scoped `@keevault/<name>`. Internal deps use `"workspace:*"`. Add third-party versions to the pnpm catalog when several packages share them.
 
-Current versions seen on npm today (pin these unless broken): @tanstack/react-start 1.168.49, @tanstack/react-router 1.170.32, @cloudflare/vite-plugin 1.54.4, wrangler 4.129.0, @cloudflare/workers-types 5.20260905.1, better-auth 1.7.2, zod 4.5.4, react 19.2.8, @vitejs/plugin-react 6.1.1, tailwindcss 4.3.3, @tailwindcss/vite 4.3.3, kysely 0.29.5.
+Dependency versions are pinned in package manifests, `pnpm-workspace.yaml`, and `pnpm-lock.yaml`. Use those files when checking installed versions; this document does not track the latest registry releases.
 
 ## Identifiers
 
@@ -93,7 +102,7 @@ Current versions seen on npm today (pin these unless broken): @tanstack/react-st
 
 ## Key hierarchy and AADs
 
-Master key: 32 bytes from Worker secret `VAULT_MASTER_KEY_V1` (b64u encoded, 43 chars). Support `VAULT_MASTER_KEY_V<n>`; `VAULT_MASTER_KEY_ACTIVE_VERSION` (var, integer, default 1) chooses which version wraps new project keys.
+Master key: 32 bytes from Worker secret `VAULT_MASTER_KEY_V1` (b64u encoded, 43 chars). Support `VAULT_MASTER_KEY_V<n>`; `VAULT_MASTER_KEY_ACTIVE_VERSION` (required var, positive integer, configured as 1 in wrangler.jsonc) chooses which version wraps new project keys.
 
 Project key wrap (AES-256-GCM under master):
 
@@ -196,7 +205,7 @@ Client -> server:
 
 States: PENDING, APPROVED, DELIVERED, CONSUMED, DECLINED, EXPIRED, CANCELED. (CREATING exists only inside the hello handler before the row is written.)
 Transitions: PENDING->APPROVED (admin approve), PENDING->DECLINED, PENDING->EXPIRED (alarm at pending TTL), PENDING/APPROVED->CANCELED (token revoked, env deleted, admin cancel), APPROVED->DELIVERED (frame sent), DELIVERED->CONSUMED (valid boot.received), APPROVED/DELIVERED->EXPIRED (alarm at payload TTL). DELIVERED->DELIVERED redelivery to the same key on resume is allowed inside payload TTL. Every other transition is a conflict. Defaults: pending TTL 1800 s, approved payload TTL 300 s, challenge TTL 30 s, max concurrent pending per token 3.
-Approval record binds: environmentId, bootId, both public key fingerprints, evidence digest (hex SHA-256 of the stored provenance summary JSON), approver user id, approver credential id, approvedAt.
+Approval record binds: environmentId, bootId, both public key fingerprints, evidence digest (hex SHA-256 of the stored provenance summary JSON), approver user id, approver credential field, approvedAt. The dashboard currently writes the literal `session` in the credential field, not a WebAuthn credential id.
 
 ## Signed build manifest v1 (provenance)
 
@@ -222,11 +231,11 @@ Verifier statuses: VERIFIED, UNVERIFIED, FAILED, UNAVAILABLE (spec §25). No sco
 ## Decisions record (appended after wave 1; these are now part of the contract)
 
 - b64u fields are parsed strictly: non-zero slack bits are rejected. Go decoders use `base64.RawURLEncoding.Strict()`.
-- Field limits chosen by the protocol package and now normative: bootNonce 16 to 64 bytes; secret ciphertext 22 to 87404 b64u chars; `claims.git.commit` and manifest commit are 40 or 64 lowercase hex; repository strings are printable ASCII without spaces, 1 to 512 chars; OCI repository `^[a-z0-9][a-z0-9._:/-]{0,254}$`; provider.name is a slug, deploymentId 1 to 128 chars, region 1 to 64 chars; manifest.builder 1 to 128 printable ASCII; reasons max 256 chars; error message 1 to 512; version counters 1 to 2147483647; evidence max 32 items; secrets max 4096 records; `claims` is required but may be `{}`; message objects are closed except evidence items with unrecognised `type`, which are kept verbatim. `boot.resume` carries `protocol: 1`. `boot.challenge` carries `bootId`. `boot.resumed.expiresAt` is required. Frame size limit 1 MiB, enforced by the server.
+- Field limits chosen by the protocol package and now normative: bootNonce 16 to 64 bytes; secret ciphertext 22 to 87404 b64u chars; `claims.git.commit` and manifest commit are 40 or 64 lowercase hex; repository strings are printable ASCII without spaces, 1 to 512 chars; OCI repository `^[a-z0-9][a-z0-9._:/-]{0,254}$`; provider.name is a slug, deploymentId 1 to 128 chars, region 1 to 64 chars; manifest.builder 1 to 128 printable ASCII; reasons max 256 chars; error message 1 to 512; version counters 1 to 2147483647; evidence max 32 items; secrets max 4096 records; `claims` is required but may be `{}`; message objects are closed except evidence items with unrecognised `type`, which are kept verbatim. `boot.resume` carries `protocol: 1`. `boot.challenge` carries `bootId`. `boot.resumed.expiresAt` is required. Frame size limit 1 MiB, enforced by both the server and Go client.
 - Manifest canonical form: nested objects and arrays are allowed as containers; scalars are strings or the integer 1; U+2028/U+2029 are not escaped; keys sort by UTF-16 code units.
 - Store: `boot_approvals` table exists (boot_id PK, approver_user_id, approver_credential_id, approved_at, client_signing_fingerprint, client_encryption_fingerprint, evidence_digest). `boot_requests` has updated_at/declined_at/delivered_at/canceled_at. Key tables have retired_at. bootstrap_tokens.max_pending_boots default 3.
-- Control plane: worker entry is apps/control-plane/src/server/worker.ts; DO class EnvironmentSessionDO in src/server/durable-objects/environment-session.ts; auth factory `createAuth(env)` in src/server/auth/auth.ts; guards `requireSession`, `requireRole`, `requireRecentPasskey` in src/server/auth/guards.ts; route files are `page.tsx` or `index.tsx` under real directories (`indexToken` matches both). Better Auth 1.7.2 uses `database: env.AUTH_DB` directly; passkey plugin is `@better-auth/passkey`.
+- Control plane: worker entry is apps/control-plane/src/server/worker.ts; DO class EnvironmentSessionDO in src/server/durable-objects/environment-session.ts; auth factory `createAuth()` in src/server/auth/auth.ts; guards `requireSession`, `requireRole`, `requireRecentPasskey` in src/server/auth/guards.ts; route files are `page.tsx` or `index.tsx` under real directories (`indexToken` matches both). Better Auth 1.7.2 uses `database: env.AUTH_DB` directly; passkey plugin is `@better-auth/passkey`.
 - Master key access contract (owned by the vault service work package, imported by the DO work package): `apps/control-plane/src/server/vault/keys.ts` exports
-  `loadMasterKeys(env: Env): MasterKeyring` (reads every `VAULT_MASTER_KEY_V<n>` secret present plus `VAULT_MASTER_KEY_ACTIVE_VERSION`),
+  `loadMasterKeys(env: MasterKeyEnv): MasterKeyring` (reads every `VAULT_MASTER_KEY_V<n>` secret present plus `VAULT_MASTER_KEY_ACTIVE_VERSION`),
   `unwrapEnvironmentDek(db: VaultDatabase, keyring: MasterKeyring, environmentId: string): Promise<{ projectId: string; dek: Bytes; version: number }>` (unwraps master -> project -> environment for the current versions; throws a typed `VaultKeyError` when a wrapped key fails to authenticate).
 - Go client lives at apps/env-client (module `github.com/ramaadi/keevault/apps/env-client`); the binary is `keevault`.

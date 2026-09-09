@@ -41,6 +41,28 @@ Go bootstrap client (apps/env-client)
 
 The Worker's `fetch` handler in `worker.ts` checks the request path first: a request to `/bootstrap/v1` goes to `handleBootstrapRequest`, everything else goes to the TanStack Start server entry. The bootstrap path never renders a page and never reads a session cookie.
 
+## Client configuration and distribution
+
+The Go executable reads `keevault.json` from its working directory when present,
+or an explicit `--config` path. It checks the configured environment ID and
+required secret names before acknowledging an approval, waits for `boot.consumed`,
+and execs the configured command. See [client configuration](../apps/env-client/README.md)
+for field validation and overrides.
+
+Release CI compiles Linux amd64 and arm64 binaries once, then uploads versioned
+artifacts to R2. The example Docker build downloads the selected binary and checks
+a pinned SHA-256 value. R2 is needed during image construction, not workload boot.
+This repository contains the publication workflow; it does not provision the bucket.
+See [releases](./releases.md).
+
+## Known consistency limits
+
+The Durable Object serializes boot decisions. Secret writes and key rotations
+use D1 service calls outside that serialization. Secret writes reject stale row
+versions, but rotation can still race writes and leave ciphertext inconsistent
+with its metadata. Initial-owner creation also uses a non-atomic check followed
+by insertion. These are open findings in [the audit](./audit-2026-09-09.md).
+
 ## Request paths
 
 ### Dashboard request
@@ -60,7 +82,7 @@ vault service (server/vault/service.ts) reads or writes D1 via @keevault/vault-s
 response rendered by the route component
 ```
 
-Every server function runs its body inside `guarded()`, which turns an `AuthorizationError`, a `VaultKeyError`, or a validation error into an encoded message the client-side error handling in `src/lib/vault-errors.ts` knows how to read, so no stack trace or internal detail reaches the browser.
+Vault server functions under `src/server/functions` run their bodies inside `guarded()`, which turns an `AuthorizationError`, a `VaultKeyError`, or a validation error into an encoded message the client-side error handling in `src/lib/vault-errors.ts` knows how to read, and replaces unexpected failures with a generic message. Auth setup endpoints have their own error handling.
 
 ### Bootstrap WebSocket upgrade path
 
@@ -82,7 +104,7 @@ env.ENVIRONMENT_SESSION.idFromName(environmentId).fetch(forwardedRequest)
 EnvironmentSessionDO accepts the WebSocket upgrade, may hibernate after boot.pending
 ```
 
-The client never selects an environment. Any environment identifier it sends is ignored. Failures before the upgrade completes are HTTP status codes (401, 403, 429); after the upgrade they are WebSocket close codes. See `protocol/websocket-v1.md` for the full frame catalogue and close code table.
+The token selects the environment on the server. The client does not send its configured `environmentId`; it uses that value to reject an approval for an unexpected environment. Failures before the upgrade completes are HTTP status codes (401, 403, 429); after the upgrade they are WebSocket close codes. See `protocol/websocket-v1.md` for the full frame catalogue and close code table.
 
 ### Approval path
 
@@ -209,8 +231,7 @@ When the dashboard's D1 read disagrees with the Durable Object, the Durable Obje
 apps/control-plane
 ├── depends on @keevault/crypto
 ├── depends on @keevault/protocol
-└── depends on @keevault/vault-store
-      └── depends on @keevault/crypto (indirectly, via shared encoding helpers)
+└── depends on @keevault/vault-store, which depends on zod
 
 apps/env-client (Go, separate module)
 ├── internal/vaultcrypto  mirrors packages/crypto: AES-GCM, X25519, HKDF, Ed25519, bootstrap token parsing

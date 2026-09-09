@@ -10,6 +10,8 @@ Passkey only. There is no password field and no fallback. The page calls `authCl
 
 Reachable only while the auth database has zero users; the loader calls `assertSetupOpen`, which throws a 404 the moment an owner exists, for every visitor, signed in or not. The form takes the `VAULT_SETUP_TOKEN` value, a name, and an email, and posts to a Better Auth endpoint that checks the token in constant time before creating the first user with role `owner`. Immediately after, the page prompts a passkey registration. If registration fails after the account is created, sign-in is impossible until a passkey exists, since there is no password to fall back on.
 
+The empty-user check and owner creation are separate database operations. Concurrent valid setup requests can create multiple owners. Run one setup request at a time and remove the setup token after enrollment. Setup and passkey registration do not grant step-up authority; complete a passkey sign-in before a sensitive action. See [the September audit](audit-2026-09-09.md).
+
 ## Projects (`/projects`)
 
 Lists every project. An admin or owner sees a "New project" button that opens a dialog for a name and slug. Viewers see the same list with no create action, since `canEdit(role)` gates it.
@@ -24,7 +26,7 @@ Shows the environment's name, current environment key version, and provenance mo
 
 **Secrets.** Every secret name is listed with a masked value, `••••••••••••` at a fixed width so the mask never leaks a value's length, and its last-updated time. An admin can create a secret, replace its value, or delete it. A ".env" import accepts pasted text, sends it once over HTTPS, and the Worker parses and encrypts each line independently; nothing pasted is ever returned afterward.
 
-**Tokens.** Lists bootstrap tokens for this environment with their labels, CIDR allow lists, and revocation state. Creating a token requires the admin role and a recent passkey verification; the generated secret is shown exactly once in a copy-once dialog and cannot be retrieved again. Revoking or editing a token's CIDR list requires the admin role, without an additional step-up prompt. This tab also lists trusted signers for the signed-build-manifest verifier: an admin can add or revoke a signer's fingerprint here, again without a step-up prompt.
+**Tokens.** Lists bootstrap tokens for this environment with their labels, CIDR allow lists, and revocation state. Creating a token requires the admin role and a recent passkey verification; the generated secret is shown exactly once in a copy-once dialog and cannot be retrieved again. Revoking a token requires the admin role without step-up. Editing its CIDR list and adding or revoking a trusted signer require admin authority and recent passkey verification.
 
 **Policy.** Sets the environment's provenance mode, `OFF`, `ADVISORY`, or `REQUIRED`, described in `docs/provenance.md`. Changing it requires the admin role and a recent passkey verification. An owner can also rotate the environment key or delete the environment from this tab, both step-up gated.
 
@@ -59,7 +61,7 @@ Lists every administrator with their role and join date. An owner can change any
 
 ## The step-up rule
 
-A signed-in session alone is not enough for the actions below. Each additionally requires a passkey verification from the last five minutes (`STEP_UP_MAX_AGE_SECONDS` in `src/lib/roles.ts`), enforced by `requireRecentPasskey` in `src/server/auth/guards.ts`. This table is read directly from the guard calls in `src/server/functions/*.ts`.
+A signed-in session alone is not enough for the actions below. Each additionally requires a passkey verification from the last five minutes (`STEP_UP_MAX_AGE_SECONDS` in `src/lib/roles.ts`), enforced by `requireRecentPasskey` in `src/server/auth/guards.ts`. Only a successful `/passkey/verify-authentication` session receives `stepUpAt`; setup and registration sessions do not. Reverification uses a fresh passkey sign-in. This table is read directly from the guard calls in `src/server/functions/*.ts`.
 
 | Action                                        | Server function                                   | Minimum role | Step-up required |
 | --------------------------------------------- | ------------------------------------------------- | ------------ | ---------------- |
@@ -105,4 +107,4 @@ This matches the permissions table in `docs/product-specs.md` section 21, except
 
 **Reveal a stored secret's value.** There is no server function that returns a decrypted secret to the browser once it has been stored, and the UI has no control for it. `MaskedSecret` renders a fixed-width mask with no toggle. The Worker is technically capable of decrypting a secret, since that capability is required to build boot payloads, but no dashboard code path exposes it. This deliberately narrows the ways a secret value could leak by accident. It is not a cryptographic guarantee that the Worker cannot read secrets.
 
-**Invite a new operator.** The settings page shows this plainly: Better Auth 1.7.2's passkey plugin can only register a credential for an already-authenticated session, so an invited account would have a user row with no way to reach its first passkey. `inviteAdmin` in `src/server/auth/setup.ts` exists as a stub that throws `"inviteAdmin is not implemented yet."`; it is not implemented in V1. Operators are added only through the first-owner setup ceremony, and additional accounts must currently be created the same way infrastructure creates the first owner, then have their role changed on `/settings`.
+**Invite a new operator.** The settings page shows this plainly: Better Auth 1.7.2's passkey plugin can only register a credential for an already-authenticated session, so an invited account would have a user row with no way to reach its first passkey. `inviteAdmin` in `src/server/auth/setup.ts` exists as a stub that throws `"inviteAdmin is not implemented yet."`; it is not implemented in V1. Setup creates the initial owner only. There is currently no supported workflow for onboarding additional operators; creating a user row alone does not let that user register a passkey.

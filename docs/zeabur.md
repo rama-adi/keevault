@@ -6,9 +6,18 @@ consideration in product-specs.md section 33 with the Phase 10 test list in
 section 43. Every row starts "not yet run" and stays that way until someone
 actually runs it against Zeabur and records the result here.
 
-None of these can be run from this repository alone: they need a Zeabur
-account, a deployed keevault control plane, and the example image in
-`examples/zeabur-node-app`.
+These checks require a Zeabur account, a deployed keevault control plane, and
+the [example image](../examples/zeabur-node-app/README.md).
+
+Before testing, configure the service's HTTP health-check path as `/healthz`.
+Zeabur defaults to a TCP port probe; the image's Docker `HEALTHCHECK` is a separate
+configuration. Record the service's port and probe settings with the results. See
+[Zeabur health checks](https://zeabur.com/docs/en-US/operations/monitoring/health-checks).
+
+For the 30-minute delay test, raise both the client session timeout and the
+server pending boot TTL above the delay. The client default is `30m`, so leaving
+it unchanged would test timeout expiry instead of delayed approval. Record both
+values for every timing test.
 
 ## Deployment mode tests
 
@@ -51,8 +60,10 @@ it means the operator watched it happen against a real Zeabur deployment.
 
 ## Metadata: what Zeabur gives you versus what is merely claimed
 
-- Available from Zeabur as build metadata, forwarded as untrusted claims:
-  commit SHA, repository owner and name, branch, and deployment id.
+- Map Zeabur metadata into the client's `VAULT_GIT_REPOSITORY`,
+  `VAULT_GIT_COMMIT`, and `VAULT_DEPLOYMENT_ID` variables explicitly. The client
+  does not automatically read provider variables and has no branch claim flag.
+  See [Zeabur's metadata variables](https://zeabur.com/docs/en-US/deploy/config/environment-variables).
 - Not available from Zeabur as a cryptographic attestation: there is no
   remote attestation of which exact binary or image is currently running,
   independent of what the deployment claims. The prebuilt OCI path narrows

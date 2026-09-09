@@ -21,11 +21,11 @@ Authorization: Bearer vlt_boot_<tokenId>.<secret>
 Token rules:
 
 - The token format is `^vlt_boot_([0-9A-HJKMNP-TV-Z]{26})\.([A-Za-z0-9_-]{43})$`. The first group is a Crockford base32 ULID, the second is base64url of 32 random bytes.
-- Send the token only in the `Authorization` header. A token in the query string is rejected with close code 4401 even when it is otherwise valid, because URLs end up in logs.
+- Send the token only in the `Authorization` header. A token in the query string is rejected before upgrade with HTTP 401, corresponding to protocol code 4401, even when otherwise valid, because URLs end up in logs.
 - The server hashes the 43 character secret with SHA-256 and compares the lowercase hex digest against `token_hash` in D1 using a constant-time comparison.
 - The server then checks revocation, expiry, and the token's CIDR allow list against `CF-Connecting-IP`. An empty allow list skips the CIDR check.
 
-The token selects the environment. The client never names an environment, and any environment identifier a client sends is ignored or rejected.
+The token selects the environment. No client frame selects an environment. The Go client may pin an expected `environmentId` in local `keevault.json` configuration and reject a mismatched approval; that setting is not sent to the server.
 
 Before the upgrade completes, failures are HTTP status codes: 401 for a missing or unparseable token, 403 for a revoked token or a CIDR miss, 429 for rate limiting. After the upgrade, the same conditions use the matching WebSocket close codes below.
 
@@ -268,10 +268,10 @@ The approval record binds the environment id, the boot id, the fingerprints of b
 | Pending approval TTL                   | 1800 s                  | configurable per environment                         |
 | Approved payload TTL                   | 300 s                   | starts at approval, not at delivery                  |
 | Resume challenge TTL                   | 30 s                    | single use, discarded after one verification attempt |
-| Reconnect backoff                      | 1 s to 15 s with jitter | client side, until the pending TTL runs out          |
+| Reconnect backoff                      | 1 s to 15 s with jitter | client side, bounded by the client session timeout   |
 | Max concurrent pending boots per token | 3                       | a fourth `boot.hello` gets 4409                      |
 
-The server enforces every TTL with a Durable Object alarm. A client must not assume a socket stays open for the whole TTL.
+The server schedules pending and payload expiry with a Durable Object alarm and checks challenge expiry when verifying the response. A client must not assume a socket stays open for the whole TTL.
 
 ## Reconnect and resume proof
 

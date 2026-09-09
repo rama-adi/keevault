@@ -26,11 +26,16 @@ Keevault launches the command in `keevault.json` from the current directory.
 All fields are optional. A command must come from the file or CLI. Use
 `--config path/to/keevault.json` or `KEEVAULT_CONFIG` to select another file.
 An explicitly selected file must exist. Unknown fields, malformed JSON,
-invalid or duplicate secret names, and invalid argv arrays fail at startup.
+invalid or duplicate secret names, files larger than 1 MiB, and invalid argv
+arrays fail at startup. Required secret names must match
+`^[A-Z_][A-Z0-9_]{0,255}$`.
 Credentials belong in `VAULT_BOOTSTRAP_TOKEN`, never in the config file.
 
 Flags override environment variables, which override file settings. CLI command
-arguments replace the file's entire command array. `--environment-id` and
+arguments replace the file's entire command array. Empty environment variables
+fall back to file settings; an explicitly empty URL or environment-ID flag does
+not. Relative paths and the command resolve from the process working directory,
+not the config file's directory. `--environment-id` and
 `KEEVAULT_ENVIRONMENT_ID` override `environmentId`; `--vault-url` and
 `VAULT_URL` override `vaultUrl`. The command runs directly without shell
 expansion. Use an explicit shell command only when shell behavior is needed.
@@ -51,9 +56,11 @@ What happens on start:
 3. Wait for a human to approve the boot. Disconnects are retried with backoff
    from 1 to 15 seconds, and the boot is resumed by signing a server challenge.
 4. Open the key envelope, decrypt every secret, acknowledge the payload, and
-   exec the target command with the decrypted environment.
+   wait for the server to confirm consumption, then exec the target command
+   with the decrypted environment.
 
-The process never exits 0. On success it is replaced by the application.
+The bootstrap client never returns 0 itself. After replacement, the application
+controls the exit status and may exit 0.
 
 ## Dockerfile
 
@@ -68,36 +75,43 @@ provided by `vaultUrl` in the config file.
 
 ## Configuration
 
-| Variable                | Flag                      | Required           | Meaning                                                                                          |
-| ----------------------- | ------------------------- | ------------------ | ------------------------------------------------------------------------------------------------ |
-| `VAULT_URL`             | `--vault-url`             | yes, or `vaultUrl` | Vault endpoint. `https` and `wss` both work. A URL without a path gets `/bootstrap/v1` appended. |
-| `VAULT_BOOTSTRAP_TOKEN` | `--vault-bootstrap-token` | yes                | Token of the form `vlt_boot_<id>.<secret>`.                                                      |
-| `VAULT_GIT_REPOSITORY`  | `--vault-git-repository`  | no                 | Git repository claim. Must be set together with the commit.                                      |
-| `VAULT_GIT_COMMIT`      | `--vault-git-commit`      | no                 | Git commit claim.                                                                                |
-| `VAULT_OCI_REPOSITORY`  | `--vault-oci-repository`  | no                 | Image repository claim. Must be set together with the digest.                                    |
-| `VAULT_OCI_DIGEST`      | `--vault-oci-digest`      | no                 | Image digest claim.                                                                              |
-| `VAULT_DEPLOYMENT_ID`   | `--vault-deployment-id`   | no                 | Provider deployment id claim.                                                                    |
-| `VAULT_PROVIDER`        | `--vault-provider`        | no                 | Provider name. Defaults to `zeabur` when a deployment id is set, and is omitted otherwise.       |
-| `VAULT_EVIDENCE_FILE`   | `--vault-evidence-file`   | no                 | Path to a JSON array of evidence items, sent unchanged with the boot request.                    |
-| `VAULT_PENDING_TIMEOUT` | `--vault-pending-timeout` | no                 | How long to wait for approval. Go duration syntax, default `30m`.                                |
-| `VAULT_LOG_LEVEL`       | `--vault-log-level`       | no                 | `debug`, `info`, `warn` or `error`. Default `info`.                                              |
+| Variable                  | Flag                      | Required           | Meaning                                                                                                                                        |
+| ------------------------- | ------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `KEEVAULT_CONFIG`         | `--config`                | no                 | Config file path; defaults to `./keevault.json` when present.                                                                                  |
+| `KEEVAULT_ENVIRONMENT_ID` | `--environment-id`        | no                 | Expected environment ID; overrides the config file.                                                                                            |
+| `VAULT_URL`               | `--vault-url`             | yes, or `vaultUrl` | Vault endpoint. `https` and `wss` work; `http` and `ws` are also accepted for local development. An empty or `/` path becomes `/bootstrap/v1`. |
+| `VAULT_BOOTSTRAP_TOKEN`   | `--vault-bootstrap-token` | yes                | Token of the form `vlt_boot_<id>.<secret>`.                                                                                                    |
+| `VAULT_GIT_REPOSITORY`    | `--vault-git-repository`  | no                 | Git repository claim. Must be set together with the commit.                                                                                    |
+| `VAULT_GIT_COMMIT`        | `--vault-git-commit`      | no                 | Git commit claim.                                                                                                                              |
+| `VAULT_OCI_REPOSITORY`    | `--vault-oci-repository`  | no                 | Image repository claim. Must be set together with the digest.                                                                                  |
+| `VAULT_OCI_DIGEST`        | `--vault-oci-digest`      | no                 | Image digest claim.                                                                                                                            |
+| `VAULT_DEPLOYMENT_ID`     | `--vault-deployment-id`   | no                 | Provider deployment id claim.                                                                                                                  |
+| `VAULT_PROVIDER`          | `--vault-provider`        | no                 | Provider name. Defaults to `zeabur` when a deployment id is set, and is omitted otherwise.                                                     |
+| `VAULT_EVIDENCE_FILE`     | `--vault-evidence-file`   | no                 | Path to a JSON array of evidence items, sent unchanged with the boot request.                                                                  |
+| `VAULT_PENDING_TIMEOUT`   | `--vault-pending-timeout` | no                 | Whole bootstrap-session timeout, including reconnects and acknowledgement. Positive Go duration, default `30m`.                                |
+| `VAULT_LOG_LEVEL`         | `--vault-log-level`       | no                 | `debug`, `info`, `warn` or `error`. Default `info`.                                                                                            |
+
+`--keevault-token` is an alias for `--vault-bootstrap-token`; both read
+`VAULT_BOOTSTRAP_TOKEN` by default. When both flags appear, the last wins.
 
 Claims are untrusted workload input. The vault treats them as hints for the
 approver and verifies provenance separately.
 
-`VAULT_BOOTSTRAP_TOKEN` and `VAULT_EVIDENCE_FILE` are removed from the child
-environment. Every other variable is passed through, and a decrypted secret
-replaces a variable of the same name.
+The client removes inherited `VAULT_BOOTSTRAP_TOKEN` and `VAULT_EVIDENCE_FILE`
+entries before applying decrypted secrets. Secrets with those names can therefore
+add them back. Other inherited variables pass through, and a decrypted secret
+replaces a variable of the same name. Executable lookup uses the client's
+inherited `PATH`, before applying decrypted environment variables.
 
 ## Exit codes
 
-| Code | Meaning                                                                                |
-| ---- | -------------------------------------------------------------------------------------- |
-| 0    | Never returned. A successful boot replaces the process with the command.               |
-| 2    | Configuration error: missing or malformed settings, or a command that cannot be found. |
-| 3    | An administrator declined the boot.                                                    |
-| 4    | The boot expired, was canceled, or the pending timeout ran out.                        |
-| 5    | Unrecoverable transport or protocol failure, including a rejected token.               |
+| Code | Meaning                                                                            |
+| ---- | ---------------------------------------------------------------------------------- |
+| 0    | Never returned by the bootstrap client; the launched application may return it.    |
+| 2    | Configuration error, a missing required secret, or a command that cannot be found. |
+| 3    | An administrator declined the boot.                                                |
+| 4    | The boot expired, was canceled, or the pending timeout ran out.                    |
+| 5    | Unrecoverable transport or protocol failure, including a rejected token.           |
 
 ## What is logged
 
@@ -119,13 +133,15 @@ containing a secret name or value.
 
 ## Building
 
+Run from `apps/env-client` with Go 1.26 or newer:
+
 ```bash
 ./build.sh
 ```
 
 This writes static `linux/amd64` and `linux/arm64` binaries to `dist/` with
 `CGO_ENABLED=0 -trimpath -ldflags "-s -w"` and fails if a binary exceeds
-15 MiB. Current size is about 6.5 MiB per target.
+15 MiB. The script prints each binary's measured size.
 
 ## Tests
 
@@ -135,6 +151,6 @@ go test ./...
 
 The suite covers the crypto primitives with tamper cases, the protocol
 decoder, the shared vectors in `crypto/test-vectors` at the repository root
-(skipped when that directory is missing), and a fake vault server that walks a
+which are skipped when that directory is missing, and a fake vault server that walks a
 full approval including a dropped connection, a resume proof, envelope
 delivery and the acknowledgement digest.

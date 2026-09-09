@@ -1,103 +1,52 @@
 # Key rotation
 
-Losing the sole master key makes every piece of vault ciphertext permanently unrecoverable. Before running any procedure below, confirm a secure offline copy of the current `VAULT_MASTER_KEY_V<n>` exists outside Cloudflare, per spec section 46.
+Back up every required `VAULT_MASTER_KEY_V<n>` outside Cloudflare before rotation. A database backup cannot replace a lost wrapping key.
 
-This document covers the three rotation procedures from spec section 39: environment key, project key, and master key. Master-key versioning uses `VAULT_MASTER_KEY_V<n>` Worker secrets selected by `VAULT_MASTER_KEY_ACTIVE_VERSION`, per the engineering brief.
+Environment and project rotation are implemented as owner-only dashboard actions with recent passkey verification. Master-key rewrap is not implemented as a service, command, or dashboard action. The procedure below describes the requirements for an operator migration, not an available button.
 
-## Runbook 1: environment key rotation
+## Current concurrency limitation
 
-Use after suspected environment-key exposure. This is the only rotation that requires secret plaintext to exist transiently inside the Worker, since every secret value must be decrypted and re-encrypted under the new key.
+The [2026-09-09 audit](audit-2026-09-09.md) found unresolved rotation races. Environment rotation reads a secret snapshot, encrypts it, then updates rows by id without checking the snapshot's versions. A competing secret write can be overwritten with ciphertext authenticated for an older version; a new secret can miss the snapshot entirely. Project rotation also needs coordination with environment creation and environment-key rotation.
 
-### Preconditions
+Arrange a maintenance window and prevent other operators or automation from writing secrets, importing dotenv files, creating environments, or rotating keys in the affected project. Let in-flight mutations finish first. The application does not enforce this pause. If you cannot exclude competing mutations, postpone rotation until the implementation coordinates them. Record a recoverable pre-rotation database snapshot and keep all wrapping keys required to read it.
 
-- The current environment key unwraps successfully under the active project key.
-- No boot is `APPROVED` or `DELIVERED` for this environment. Wait for those to reach `CONSUMED`, `EXPIRED`, or `CANCELED`, or cancel them, before starting. A boot mid-delivery is wrapped to the old environment key version and cannot be salvaged after rotation.
-- An administrator has recent step-up passkey authentication, since key rotation is a step-up-gated action per spec section 22.
+## Environment key rotation
 
-### Steps
+Use the environment page's rotation action as an owner after passkey verification. Stop new boot approvals and finish or cancel live boots before maintenance. Rotation itself does not drain or cancel boots, and it cannot revoke secrets already delivered.
 
-1. Unwrap the current environment key using the active project key.
-2. Generate a new environment key, `ENV_KEY_vNext`, from a CSPRNG. Do not derive it from the old key or from any hash of project or environment identity.
-3. Decrypt every secret in `secrets` for this `environment_id` under the current environment key.
-4. Re-encrypt every secret under `ENV_KEY_vNext` with a fresh 96-bit nonce per value, using the AAD from the engineering brief's secret-value wrap, incrementing `env_key_version` and `secret_version` for each row.
-5. Wrap `ENV_KEY_vNext` under the current project key, writing a new row to `environment_keys` with the incremented `version` and `status` set to active.
-6. Atomically switch `environments.current_env_key_version` to the new version in the same transaction that marks the previous `environment_keys` row `status = 'retired'`.
-7. Retire the previous environment key row. Do not delete it. Keep it for audit and for decrypting any historical D1 export made before rotation.
+The service in `src/server/vault/rotation.ts` performs these operations:
 
-### Verification queries
+1. Unwrap the current environment and project keys.
+2. Generate a new random environment key and encrypt each secret with a fresh nonce. `env_key_version` increases; `secret_version` stays unchanged.
+3. Insert the new environment-key row.
+4. Batch the secret rewrites, retirement of the old environment-key row, and update of `environments.current_env_key_version`.
+5. Write `environment-key.rotated` with version numbers and the number of secrets re-encrypted.
 
-- Query `environments` for the rotated row and confirm `current_env_key_version` equals the new version.
-- Query `environment_keys` for this `environment_id` and confirm exactly one row has `status = 'active'` at the new version, and every prior version has `status = 'retired'`.
-- Query `secrets` for this `environment_id` and confirm every row's `env_key_version` equals the new version and no row still references the retired version.
-- Query `boot_requests` for this `environment_id` and confirm no row is `PENDING`, `APPROVED`, or `DELIVERED` referencing the old environment key version.
+The batch does not protect the earlier reads from concurrent changes. The new key insertion occurs before the batch, so a failed batch can leave an extra key row. Do not retry blindly after failure; inspect the key rows and active pointer first.
 
-### Rollback
+Verify that the environment points to the new version, exactly one environment-key row is active, and every current secret references the new key version. Confirm a controlled boot can decrypt the resulting values without printing them. Keep retired keys and the pre-rotation database snapshot for recovery.
 
-If re-encryption fails partway, do not switch `current_env_key_version`. The previous environment key remains active and untouched until the transaction in step 6 commits. Because step 6 is a single atomic transaction, there is no partially-rotated state visible to readers. If a bug is discovered after the switch has committed, restore from the retired `environment_keys` row and the pre-rotation `secrets` ciphertext using D1 point-in-time recovery, since the retired key is still available to decrypt that older ciphertext.
+If a committed rotation produces unreadable data, restore a consistent database snapshot with its required wrapping keys. Changing only the active version or restoring only a key row does not restore overwritten ciphertext. Keep competing writes paused until verification or recovery finishes.
 
-### What is logged
+## Project key rotation
 
-Write `environment-key.rotated` to `audit_events` with `environment_id`, the old and new `environment_keys` version numbers, and the admin's actor ID. Never log the environment key itself, the decrypted secret plaintext, or the wrapping shared secret.
+Use the project page's rotation action as an owner after passkey verification. Apply the same maintenance precautions above.
 
-## Runbook 2: project key rotation
+The service generates a new project key and rewraps every environment-key row for that project, including retired versions. It updates those wraps in place without changing the environment-key material or version. It inserts the new project-key row before batching the rewraps, retirement of the old project key, and current-version switch. Secret ciphertext is unchanged. The service then writes `project-key.rotated`.
 
-No secret re-encryption is required, since only the wrapping layer above the environment key changes.
+Verify the project points to the new version, exactly one project-key row is active, and every environment-key row in the snapshot now references that version. Confirm the environments still decrypt. A failed batch can leave the separately inserted project-key row; inspect it before retrying. For a failure after commit, restore the database snapshot and required master keys together. The retired project key alone cannot reverse wraps updated in place.
 
-### Preconditions
+## Master key migration requirements
 
-- The current project key unwraps successfully under the active master key version.
-- An administrator has recent step-up passkey authentication.
+There is no implemented master-key rewrap operation. The `master-key-rewrapped` audit name exists, but no current service emits it. A migration must use the cryptographic wrapping functions with the correct authenticated metadata; changing `master_key_version` in SQL alone breaks decryption.
 
-### Steps
+Before implementing and rehearsing a migration:
 
-1. Unwrap every active `environment_keys` row under this project's current project key.
-2. Generate a new project key, `PROJECT_KEY_vNext`, from a CSPRNG.
-3. Rewrap every environment key under `PROJECT_KEY_vNext`, writing new `environment_keys` rows with `project_key_version` set to the new version and the same `wrapped_key` content re-encrypted, or updating the existing rows' wrap in place if the schema treats wrap as mutable per version. Keep `env_key_version` unchanged, since the environment key material itself does not change.
-4. Wrap `PROJECT_KEY_vNext` under the active master key version, writing a new row to `project_keys` with the incremented `version`.
-5. Atomically switch `projects.current_project_key_version` to the new version and mark the previous `project_keys` row `status = 'retired'`.
+1. Back up the old key and generate and back up a new independent 32-byte key.
+2. Add the new Worker secret alongside the old one. Keep every referenced master-key version available.
+3. Prevent project creation and rotations during migration, or implement coordination that prevents old-version rows appearing after the migration scan.
+4. Rewrap project-key rows under the new master key, updating the ciphertext, nonce, and authenticated version metadata together. Account for retired project keys as well as active ones.
+5. Verify all retained rows decrypt and select the new `VAULT_MASTER_KEY_ACTIVE_VERSION` before resuming writes.
+6. Remove an old Worker secret only after confirming no live or retained database row needs it. Keep its offline backup for historical database restores.
 
-### Verification queries
-
-- Query `projects` for the rotated row and confirm `current_project_key_version` equals the new version.
-- Query `project_keys` for this `project_id` and confirm exactly one row has `status = 'active'`.
-- Query `environment_keys` for every environment under this project and confirm `project_key_version` equals the new version on every active row.
-
-### Rollback
-
-The previous project key row stays in `project_keys` with `status = 'retired'`. If the switch has not yet committed, no environment key has lost its old wrap, since step 3 writes new wraps without deleting the old ones until the transaction commits. If a problem surfaces after commit, the retired project key can still unwrap the environment keys it wrapped historically, so restoring from a pre-rotation D1 snapshot recovers a working state.
-
-### What is logged
-
-Write `project-key.rotated` to `audit_events` with `project_id`, old and new `project_keys` version numbers, and the admin's actor ID.
-
-## Runbook 3: master key rotation
-
-Support master-key versioning from day one using `VAULT_MASTER_KEY_V1`, `VAULT_MASTER_KEY_V2`, and so on as separate Cloudflare Worker secrets, with `VAULT_MASTER_KEY_ACTIVE_VERSION` selecting which version wraps new project keys. Never perform this as a single irreversible step.
-
-### Preconditions
-
-- A secure offline copy of the current active master key version already exists, per spec section 46.
-- The new master key version has been generated with a CSPRNG and is ready to add as a Worker secret before this runbook starts.
-
-### Steps
-
-1. Add the new Worker secret, for example `VAULT_MASTER_KEY_V2`, alongside the existing `VAULT_MASTER_KEY_V1`. Do not remove `V1` yet.
-2. Deploy a Worker build capable of reading both `V1` and `V2`, so in-flight requests against project keys still wrapped under `V1` continue to succeed during the rewrap.
-3. Rewrap every active project key: unwrap under the master key version recorded in its `project_keys.master_key_version` column, then wrap under `V2`, writing the updated `master_key_version` and `wrapped_key` for each row.
-4. Confirm no `project_keys` row with `status = 'active'` still references the old master key version.
-5. Set `VAULT_MASTER_KEY_ACTIVE_VERSION` to the new version, so newly created project keys wrap under `V2` going forward.
-6. Remove the old master key Worker secret in a later, separate deployment, only after confirming step 4 and after a safe waiting period in case a rollback is needed.
-
-### Verification queries
-
-- Query `project_keys` for every row with `status = 'active'` and confirm `master_key_version` equals the new version.
-- Count rows in `project_keys` where `master_key_version` equals the old version and `status = 'active'`. This count must be zero before proceeding to step 5.
-- After step 5, confirm the Worker's active configuration reads `VAULT_MASTER_KEY_ACTIVE_VERSION` as the new version.
-
-### Rollback
-
-Because both master key secrets remain present through step 5, rolling back before step 6 means reverting `VAULT_MASTER_KEY_ACTIVE_VERSION` to the old version and leaving both secrets in place. Once the old secret is removed in step 6, rollback requires restoring it from the offline backup, since no active code path can otherwise unwrap project keys that still reference the removed version. This is why step 4 must confirm zero remaining references before step 6 runs.
-
-### What is logged
-
-Write `master-key-rewrapped` to `audit_events` for each project key rewrapped, with `project_id`, old and new `master_key_version`, and the admin's actor ID. Never log either master key value.
+Changing the active version only controls new project-key wraps; it does not migrate existing rows. Reverting that setting also does not reverse a rewrap. Keep both master keys during rollback and recovery. Rehearse the migration and restore against a scratch deployment before using it on production data.

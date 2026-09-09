@@ -1,4 +1,23 @@
-# V1 Secret Vault — Full Implementation Plan
+# Keevault V1 product specification
+
+## Status of this specification
+
+This document describes intended V1 behavior. It is not evidence that every
+feature or launch criterion is complete. The [engineering brief](./engineering-brief.md)
+tracks implementation, and the [latest audit](./audit-2026-09-09.md) records fixes
+and open findings.
+
+As of 2026-09-09, client configuration and the R2 publication workflow are
+implemented. Additional administrator invitations are not implemented. First-owner
+creation is not atomic, and key rotation can race secret writes. Passkey step-up
+is granted only after authentication, not during setup. The approval credential
+field currently stores `session` rather than an individual WebAuthn credential ID.
+Master-key rewrap tooling and repository/digest policy allow lists are not implemented.
+Live Zeabur and browser passkey validation remain outstanding.
+
+The exact wire formats and cryptographic encodings are defined in
+[the protocol](../protocol/websocket-v1.md) and the engineering brief. Examples
+below that describe future features do not extend that wire contract.
 
 ## 1. Objective
 
@@ -210,7 +229,12 @@ ENTRYPOINT ["/usr/local/bin/keevault", "--"]
 CMD ["node", "server.js"]
 ```
 
-After authorization, the bootstrapper executes the target command with the decrypted environment.
+The example image downloads a precompiled Linux binary from a versioned R2
+path during image build and verifies a pinned checksum. CI produces amd64 and
+arm64 artifacts. See [release setup](./releases.md).
+
+After approval and server confirmation of consumption, the bootstrapper executes
+the target command with the decrypted environment.
 
 The bootstrap process itself disappears.
 
@@ -218,45 +242,36 @@ The bootstrap process itself disappears.
 
 # 5. Repository structure
 
-Recommended monorepo:
+Implemented monorepo:
 
 ```text
-vault/
+keevault/
 ├── apps/
 │   ├── control-plane/
-│   │   ├── src/
-│   │   │   ├── worker.ts
-│   │   │   ├── durable-objects/
-│   │   │   ├── auth/
-│   │   │   ├── vault/
-│   │   │   ├── provenance/
-│   │   │   └── dashboard-routes/
+│   │   ├── src/routes/
+│   │   ├── src/components/
+│   │   ├── src/server/
 │   │   └── wrangler.jsonc
-│   │
-│   └── dashboard/
-│       └── ...
-│
-├── cmd/
-│   └── keevault/
-│       └── Go source
-│
+│   └── env-client/
+│       ├── main.go
+│       ├── project_config.go
+│       └── internal/
+├── packages/
+│   ├── crypto/
+│   ├── protocol/
+│   └── vault-store/
 ├── migrations/
 │   ├── auth/
 │   └── vault/
-│
 ├── protocol/
 │   ├── websocket-v1.md
 │   ├── messages.schema.json
 │   └── test-vectors/
-│
-├── crypto/
-│   └── test-vectors/
-│
+├── crypto/test-vectors/
+├── examples/zeabur-node-app/
+├── scripts/build-release.sh
+├── .github/workflows/release-client.yml
 └── docs/
-    ├── threat-model.md
-    ├── key-rotation.md
-    ├── incident-response.md
-    └── provenance.md
 ```
 
 Protocol test vectors should be shared between the TypeScript and Go implementations so cryptographic compatibility is continuously tested.
@@ -1177,6 +1192,10 @@ Public signup should be disabled.
 
 Provide a one-time first-owner setup ceremony and remove/disable it immediately after initialization.
 
+The current implementation closes setup after a user exists, but concurrent
+valid-token requests can create multiple owners. Invitations are not implemented;
+setup cannot be repeated to add users after initialization.
+
 ---
 
 # 22. Approval authentication
@@ -1588,29 +1607,40 @@ Do not imply provenance proves what is currently executing.
 The Go bootstrapper performs:
 
 ```text
-1. Read configuration.
+1. Read configuration and validate launch settings.
 2. Generate ephemeral keypairs.
-3. Open WebSocket.
-4. Authenticate bootstrap token.
-5. Submit boot claims/evidence.
-6. Wait for approval.
-7. Reconnect automatically if necessary.
-8. Receive environment-key envelope + encrypted secrets.
-9. Derive wrapping key.
-10. Decrypt environment DEK.
-11. Decrypt all secret values.
-12. Build child environment.
-13. ACK successful payload processing.
-14. Destroy temporary buffers best-effort.
-15. exec target process.
+3. Open a WebSocket authenticated by the bootstrap token.
+4. Submit boot claims/evidence.
+5. Wait for approval, reconnecting with resume proof if necessary.
+6. Receive the environment-key envelope and encrypted secrets.
+7. Check the configured environment ID, when provided.
+8. Derive the wrapping key and decrypt the environment DEK.
+9. Decrypt all secret values and check required secret names.
+10. ACK the exact payload digest.
+11. Wait for boot.consumed from the server.
+12. Resolve the command and build its environment.
+13. Destroy temporary buffers best-effort.
+14. exec the target process.
 ```
 
-Configuration:
+Implemented configuration:
 
-```text
-VAULT_URL
-VAULT_BOOTSTRAP_TOKEN
+```json
+{
+  "vaultUrl": "https://vault.example.com",
+  "environmentId": "env_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "requiredSecrets": ["DATABASE_URL"],
+  "command": ["node", "server.js"]
+}
 ```
+
+The client reads `keevault.json` from the working directory, or an explicit
+`--config` / `KEEVAULT_CONFIG` path. Keep `VAULT_BOOTSTRAP_TOKEN` outside this
+file. The token selects the environment; `environmentId` pins the expected
+approval and `requiredSecrets` checks presence without filtering delivered keys.
+`VAULT_URL` can override the file URL. Flags override the corresponding settings,
+and command arguments replace the configured command. See
+[client configuration](../apps/env-client/README.md) for exact precedence.
 
 Optional non-secret metadata:
 
@@ -1922,6 +1952,11 @@ Already CONSUMED sessions cannot be retroactively revoked because the workload a
 ---
 
 # 39. Key rotation
+
+These procedures describe the intended result. The current implementation does
+not serialize the snapshot and commit against concurrent secret writes or key
+creation. Follow the coordination requirements in [key rotation](./key-rotation.md)
+and the unresolved finding in [the audit](./audit-2026-09-09.md).
 
 ## Environment key
 
