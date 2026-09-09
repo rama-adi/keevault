@@ -50,11 +50,21 @@ export const ProviderClaim = z.strictObject({
   region: z.string().regex(PROVIDER_REGION).optional(),
 });
 
+/** Client-reported executable metadata. This is not runtime attestation. */
+export const ClientClaim = z.strictObject({
+  version: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9.+-]{0,63}$/),
+  os: z.string().regex(/^[a-z0-9]{1,32}$/),
+  arch: z.string().regex(/^[a-z0-9]{1,32}$/),
+  /** Omitted when the client cannot read its executable. */
+  sha256: hexDigest.optional(),
+});
+
 /**
  * Everything the workload says about itself. The server stores these, shows
  * them on the approval screen and never treats them as verified.
  */
 export const WorkloadClaims = z.strictObject({
+  client: ClientClaim.optional(),
   git: GitClaim.optional(),
   oci: OciClaim.optional(),
   provider: ProviderClaim.optional(),
@@ -244,6 +254,7 @@ export const ServerMessage = z.discriminatedUnion("type", [
 ]);
 
 export type GitClaim = z.infer<typeof GitClaim>;
+export type ClientClaim = z.infer<typeof ClientClaim>;
 export type OciClaim = z.infer<typeof OciClaim>;
 export type ProviderClaim = z.infer<typeof ProviderClaim>;
 export type WorkloadClaims = z.infer<typeof WorkloadClaims>;

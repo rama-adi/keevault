@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -128,6 +129,12 @@ func (f *fakeVault) first(ctx context.Context, conn *websocket.Conn) {
 	hello, ok := msg.(protocol.Hello)
 	if !ok {
 		f.t.Errorf("fake vault: first frame was %s, want boot.hello", msg.MessageType())
+		return
+	}
+	if hello.Claims.Client == nil || hello.Claims.Client.Version == "" ||
+		hello.Claims.Client.OS != runtime.GOOS || hello.Claims.Client.Arch != runtime.GOARCH ||
+		len(hello.Claims.Client.SHA256) != 64 {
+		f.t.Errorf("fake vault: missing client build report: %+v", hello.Claims.Client)
 		return
 	}
 	signing, err := vc.DecodeB64uLen(hello.SigningPublicKey, 32)

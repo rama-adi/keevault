@@ -8,7 +8,7 @@
  */
 
 import { ipAllowed } from "@keevault/crypto";
-import type { BootStatus } from "@keevault/protocol";
+import type { BootStatus, ClientClaim } from "@keevault/protocol";
 import {
   fromD1,
   getBootRequest,
@@ -77,6 +77,7 @@ export interface PendingBootGroup {
 /** Everything the approval screen renders (spec section 34). */
 export interface BootDetail {
   summary: BootSummary;
+  claimedClient: ClientClaim | null;
   claimedProviderName: string | null;
   claimedProviderDeploymentId: string | null;
   cidrPolicySatisfied: boolean;
@@ -297,6 +298,7 @@ export const getBootFn = createServerFn({ method: "GET" })
 
         return {
           summary: toSummary(view, labels),
+          claimedClient: view.claims.client ?? null,
           claimedProviderName: view.claims.provider?.name ?? null,
           claimedProviderDeploymentId: view.claims.provider?.deploymentId ?? null,
           cidrPolicyConfigured: allowedCidrs.length > 0,

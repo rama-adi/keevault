@@ -22,6 +22,8 @@ jobs:
           go vet ./...
           go test ./...
       - name: Build static binaries
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
         run: bash scripts/build-release.sh
       - uses: actions/upload-artifact@v4
         with:

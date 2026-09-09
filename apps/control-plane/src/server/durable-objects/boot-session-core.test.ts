@@ -13,7 +13,7 @@ import {
   x25519PublicKeyFromPrivate,
   type Bytes,
 } from "@keevault/crypto";
-import { parseServerFrame, type ServerMessage } from "@keevault/protocol";
+import { parseServerFrame, type ClientClaim, type ServerMessage } from "@keevault/protocol";
 import {
   createBootstrapToken,
   createEnvironment,
@@ -153,7 +153,7 @@ async function createHarness(
   };
 }
 
-function helloFrame(keys: BootKeys): string {
+function helloFrame(keys: BootKeys, client?: ClientClaim): string {
   return JSON.stringify({
     type: "boot.hello",
     protocol: 1,
@@ -161,6 +161,7 @@ function helloFrame(keys: BootKeys): string {
     signingPublicKey: keys.signingPublicKey,
     encryptionPublicKey: keys.encryptionPublicKey,
     claims: {
+      client,
       git: { repository: "github.com/acme/foo", commit: "a".repeat(40) },
       provider: { name: "zeabur", deploymentId: "dep-1234" },
     },
@@ -241,6 +242,19 @@ async function approve(
 }
 
 describe("boot.hello", () => {
+  it("persists a client report across hibernation without treating it as verified evidence", async () => {
+    const harness = await createHarness();
+    const keys = await bootKeys();
+    const connection = harness.sockets.open();
+    const client = { version: "v1.2.3", os: "linux", arch: "arm64", sha256: "a".repeat(64) };
+    await harness.core().handleFrame(connection, harness.identity, helloFrame(keys, client));
+    const pending = lastOf(connection);
+    if (pending.type !== "boot.pending") throw new Error("expected pending boot");
+    const view = harness.restart().get(pending.bootId);
+    expect(view?.claims.client).toEqual(client);
+    expect(view?.provenance.some((result) => result.status === "VERIFIED")).toBe(false);
+  });
+
   let harness: Harness;
 
   beforeEach(async () => {

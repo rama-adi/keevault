@@ -129,6 +129,19 @@ function ApprovalScreen({ viewer, detail }: { viewer: Viewer; detail: BootDetail
 
           <Separator />
 
+          <Section title="Client-reported build">
+            <Row label="Keevault version">{detail.claimedClient?.version ?? "not reported"}</Row>
+            <Row label="Operating system">{detail.claimedClient?.os ?? "not reported"}</Row>
+            <Row label="Architecture">{detail.claimedClient?.arch ?? "not reported"}</Row>
+            <Row label="Executable SHA-256">{detail.claimedClient?.sha256 ?? "not reported"}</Row>
+            <p className="text-muted-foreground pt-1 text-xs">
+              These values are supplied by the client and can be forged. They do not prove which
+              binary is running.
+            </p>
+          </Section>
+
+          <Separator />
+
           <Section title="Claimed workload">
             <Row label="Repository">{summary.claimedGitRepository ?? "not claimed"}</Row>
             <Row label="Commit">{summary.claimedGitCommit ?? "not claimed"}</Row>

@@ -79,6 +79,11 @@ func New(cfg Config) (*Session, error) {
 	if cfg.Environ == nil {
 		cfg.Environ = os.Environ()
 	}
+	claim, err := executableClaim()
+	if err != nil {
+		cfg.Logger.Warnf("client executable SHA-256 unavailable; reporting version and platform only")
+	}
+	cfg.Claims.Client = &claim
 	signPub, signPriv, err := vaultcrypto.GenerateEd25519()
 	if err != nil {
 		return nil, exitf(ExitProtocol, "%v", err)

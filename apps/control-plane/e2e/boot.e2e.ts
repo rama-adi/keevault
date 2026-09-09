@@ -12,7 +12,8 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, connect, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -20,6 +21,7 @@ import { argv, env as processEnv, exit, kill, stdout } from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { ClientClaim } from "@keevault/protocol";
 
 const APP_DIRECTORY = dirname(dirname(fileURLToPath(import.meta.url)));
 const REPO_ROOT = dirname(dirname(APP_DIRECTORY));
@@ -275,6 +277,7 @@ const bootViewSchema = z.object({
   bootId: z.string(),
   status: z.string(),
   environmentId: z.string(),
+  claims: z.object({ client: ClientClaim.optional() }),
 });
 
 const bootListSchema = z.array(bootViewSchema);
@@ -351,13 +354,15 @@ interface ClientRun {
   kill: () => void;
 }
 
-function startClient(
+async function startClient(
   binary: string,
   vaultOrigin: string,
   token: string,
   command: readonly string[],
-): ClientRun {
-  const child = spawn(binary, ["--", ...command], {
+): Promise<ClientRun> {
+  const configPath = join(dirname(binary), "keevault.json");
+  await writeFile(configPath, JSON.stringify({ command }));
+  const child = spawn(binary, ["--config", configPath], {
     cwd: APP_DIRECTORY,
     env: {
       ...processEnv,
@@ -469,12 +474,21 @@ async function scenarioApproval(harness: Harness, binary: string, origin: string
   say("\nScenario 1: approve a pending boot");
   const seed = await harness.seed();
   step(`seeded ${seed.environmentId} with token ${seed.tokenId}`);
-  const client = startClient(binary, origin, seed.token, TARGET_COMMAND);
+  const client = await startClient(binary, origin, seed.token, TARGET_COMMAND);
   const seen: string[] = [];
   try {
     const bootId = await waitForFirstBoot(harness, seed.environmentId);
     step(`boot ${bootId}`);
     await waitForStatus(harness, bootId, ["PENDING"], seen);
+    const view = await harness.boot(bootId);
+    const executableHash = createHash("sha256")
+      .update(await readFile(binary))
+      .digest("hex");
+    check(view?.claims.client?.version === "dev", "unstamped client reports dev version");
+    check(
+      view?.claims.client?.sha256 === executableHash,
+      "reported executable hash matches the built client",
+    );
     const approved = await harness.approve(bootId);
     check(approved.ok, `approve returned ok (status ${approved.status ?? "none"})`);
     const result = await client.wait;
@@ -503,7 +517,7 @@ async function scenarioReconnect(harness: Harness, binary: string, devPort: numb
   const proxy = await startProxy(devPort);
   const seed = await harness.seed();
   step(`seeded ${seed.environmentId} with token ${seed.tokenId}`);
-  const client = startClient(
+  const client = await startClient(
     binary,
     `http://localhost:${String(proxy.port)}`,
     seed.token,
@@ -543,7 +557,7 @@ async function scenarioReconnect(harness: Harness, binary: string, devPort: numb
 async function scenarioDecline(harness: Harness, binary: string, origin: string): Promise<void> {
   say("\nScenario 3: decline a pending boot");
   const seed = await harness.seed();
-  const client = startClient(binary, origin, seed.token, TARGET_COMMAND);
+  const client = await startClient(binary, origin, seed.token, TARGET_COMMAND);
   const seen: string[] = [];
   try {
     const bootId = await waitForFirstBoot(harness, seed.environmentId);
@@ -566,7 +580,7 @@ async function scenarioRevoke(harness: Harness, binary: string, origin: string):
   say("\nScenario 4: revoke the token while a boot is pending");
   const seed = await harness.seed();
   step(`seeded ${seed.environmentId} with token ${seed.tokenId}`);
-  const client = startClient(binary, origin, seed.token, TARGET_COMMAND);
+  const client = await startClient(binary, origin, seed.token, TARGET_COMMAND);
   const seen: string[] = [];
   try {
     const bootId = await waitForFirstBoot(harness, seed.environmentId);

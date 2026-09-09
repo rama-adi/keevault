@@ -67,7 +67,28 @@ Opens a new boot request. It must be the first frame on a connection that is not
 | `claims.provider.region`       | printable ASCII without spaces, 1 to 64 characters  | no       |
 | `evidence`                     | array of evidence items, 0 to 32 entries            | yes      |
 
-Each half of `claims` is optional and `claims` itself may be `{}`. Send `"claims": {}` rather than omitting the field.
+Each block of `claims` is optional and `claims` itself may be `{}`. Send `"claims": {}` rather than omitting the field.
+
+`claims.client`, when present, reports the Keevault executable and contains:
+
+| Field     | Format                                                          | Required within client |
+| --------- | --------------------------------------------------------------- | ---------------------- |
+| `version` | `^[A-Za-z0-9][A-Za-z0-9.+-]{0,63}$`, `dev` for unstamped builds | yes                    |
+| `os`      | `^[a-z0-9]{1,32}$`, for example `linux`                         | yes                    |
+| `arch`    | `^[a-z0-9]{1,32}$`, for example `arm64`                         | yes                    |
+| `sha256`  | 64 lowercase hex characters                                     | no                     |
+
+The digest is SHA-256 of the executable file bytes, computed once at session
+creation. Linux clients read `/proc/self/exe`; other platforms use the path
+returned by `os.Executable`, which can refer to a replaced file. This is not a
+measurement of process memory or proof of integrity. If the file cannot be
+read, omit `sha256`. All fields are untrusted and must never authorize release
+or be displayed as verified evidence. The report is persisted in the boot's
+`claims_json` in Durable Object SQLite for the boot's retention lifetime.
+
+Older clients may omit the client block. Deploy the updated server first:
+servers with the earlier closed claims schema reject this extension. No client
+downgrade retry is performed.
 
 An evidence item is either a signed build manifest or an item this version cannot check.
 

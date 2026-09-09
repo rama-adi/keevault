@@ -34,7 +34,7 @@ The workflow does not provision the bucket, credentials, or public domain.
 Push a version tag such as `v1.0.0`. Publication accepts `vMAJOR.MINOR.PATCH`
 with an optional prerelease suffix containing letters, digits, dots, or hyphens.
 Build metadata with `+` is not accepted. Other tags starting with `v` still trigger
-the build job but fail version validation in the publish job. `.github/workflows/release-client.yml` runs Go
+the build job but fail version validation before publication. `.github/workflows/release-client.yml` runs Go
 vet and tests, builds static Linux amd64 and arm64 clients, and retains them as
 a GitHub Actions artifact before publishing to R2:
 
@@ -57,6 +57,17 @@ not run vet or tests:
 bash scripts/build-release.sh
 cat apps/env-client/dist/SHA256SUMS
 ```
+
+Set `RELEASE_VERSION=v1.0.0` when building a versioned artifact locally. CI sets
+this from the release tag. Builds without it report `dev`. The client hashes its
+executable file at startup and sends the digest, version, OS, and architecture
+as untrusted claims. Hashing failures leave the digest absent and do not block
+boot. The approval screen labels the report accordingly; no release-catalog
+comparison or runtime verification is performed.
+
+Deploy the updated control plane before distributing reporting clients. Older
+clients remain accepted by the new server, but the old server's closed claims
+schema rejects the new `claims.client` field. The protocol number remains v1.
 
 ## Consume a release
 

@@ -22,6 +22,7 @@ These guides remain in the repository for people maintaining a vault deployment:
 
 ## Architecture, specifications, and reviews
 
+- [V2 draft: cloud-managed and cold key modes](./v2-draft.md)
 - [Architecture](./architecture.md)
 - [Threat model](./threat-model.md)
 - [Provenance](./provenance.md)

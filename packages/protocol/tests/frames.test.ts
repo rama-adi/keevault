@@ -5,6 +5,7 @@ import { expect, test } from "vite-plus/test";
 import { z } from "zod";
 
 import { parseClientFrame, parseServerFrame } from "../src/parse.ts";
+import { WorkloadClaims } from "../src/messages.ts";
 
 const VectorFile = z.strictObject({
   description: z.string().min(1),
@@ -101,4 +102,24 @@ test("unknown evidence is kept as sent", () => {
   const evidence = result.message.evidence[0];
   expect(evidence).toBeDefined();
   expect(evidence?.type).toBe("zeabur-metadata-v9");
+});
+
+test("client reports are optional and bounded, with only lowercase SHA-256 digests", () => {
+  const client = { version: "v1.2.3", os: "linux", arch: "arm64", sha256: "a".repeat(64) };
+  expect(WorkloadClaims.parse({ client }).client).toEqual(client);
+  expect(WorkloadClaims.parse({})).toEqual({});
+  expect(
+    WorkloadClaims.parse({ client: { version: "dev", os: "linux", arch: "amd64" } }).client?.sha256,
+  ).toBeUndefined();
+  for (const invalid of [
+    { ...client, version: "x".repeat(65) },
+    { ...client, version: "v1.0.0\nforged" },
+    { ...client, os: "" },
+    { ...client, arch: "x".repeat(33) },
+    { ...client, sha256: "A".repeat(64) },
+    { ...client, sha256: "a".repeat(63) },
+    { ...client, verified: true },
+  ]) {
+    expect(WorkloadClaims.safeParse({ client: invalid }).success).toBe(false);
+  }
 });

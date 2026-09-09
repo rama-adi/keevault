@@ -82,9 +82,18 @@ type ProviderClaim struct {
 
 // Claims is the whole untrusted claim block.
 type Claims struct {
+	Client   *ClientClaim   `json:"client,omitempty"`
 	Git      *GitClaim      `json:"git,omitempty"`
 	OCI      *OCIClaim      `json:"oci,omitempty"`
 	Provider *ProviderClaim `json:"provider,omitempty"`
+}
+
+// ClientClaim reports executable metadata without proving runtime integrity.
+type ClientClaim struct {
+	Version string `json:"version"`
+	OS      string `json:"os"`
+	Arch    string `json:"arch"`
+	SHA256  string `json:"sha256,omitempty"`
 }
 
 // Evidence is one evidence item. The manifest stays as raw JSON because the
