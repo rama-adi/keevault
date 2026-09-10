@@ -57,7 +57,7 @@ Save an offline copy of `VAULT_MASTER_KEY_V1` before continuing. See "back up th
 
 ### 3. Set BETTER_AUTH_URL
 
-`wrangler.jsonc` ships `BETTER_AUTH_URL` as `http://localhost:5173` under `vars`, for local development. Before deploying, change it to the vault's real public origin, for example:
+`wrangler.jsonc` configures the production origin as `https://vault.keevault.my.id`. For local development, override it with `BETTER_AUTH_URL="http://localhost:5173"` in `.dev.vars`. For another deployment, use its public origin:
 
 ```jsonc
 "vars": {
@@ -81,6 +81,15 @@ This runs `wrangler d1 migrations apply VAULT_DB --remote` and `wrangler d1 migr
 ```bash
 vp run deploy
 ```
+
+### Git deployments
+
+Connect `rama-adi/keevault` to the `keevault` Worker, use production branch `master`, and keep the build root at `/`. Set `SKIP_DEPENDENCY_INSTALL=true`.
+
+- Build: `npx --yes --force pnpm@11.25.0 install --frozen-lockfile && ./node_modules/.bin/vp run control-plane#build:check-no-harness`
+- Deploy: `./node_modules/.bin/vp run control-plane#db:migrate:remote && ./apps/control-plane/node_modules/.bin/wrangler deploy --config apps/control-plane/dist/server/wrangler.json`
+
+Runtime secrets belong on the Worker, outside Git and build variables. Wrangler preserves them on subsequent deployments.
 
 ### 6. Run the first-owner ceremony at /setup
 

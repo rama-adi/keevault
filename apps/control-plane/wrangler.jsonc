@@ -4,6 +4,7 @@
   "compatibility_date": "2026-09-05",
   "compatibility_flags": ["nodejs_compat"],
   "main": "src/server/worker.ts",
+  "routes": [{ "pattern": "vault.keevault.my.id", "custom_domain": true }],
   "observability": {
     "enabled": true,
   },
@@ -14,19 +15,19 @@
   //   VAULT_SETUP_TOKEN     one-time token gating the /setup ceremony
   "vars": {
     "VAULT_MASTER_KEY_ACTIVE_VERSION": "1",
-    "BETTER_AUTH_URL": "http://localhost:5173",
+    "BETTER_AUTH_URL": "https://vault.keevault.my.id",
   },
   "d1_databases": [
     {
       "binding": "VAULT_DB",
       "database_name": "keevault-vault",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "6d0d1639-236e-42bb-ab95-289cfd6d5c61",
       "migrations_dir": "../../migrations/vault",
     },
     {
       "binding": "AUTH_DB",
       "database_name": "keevault-auth",
-      "database_id": "00000000-0000-0000-0000-000000000001",
+      "database_id": "8c012e3d-10ba-4a4f-a925-56ead497e3d7",
       "migrations_dir": "../../migrations/auth",
     },
   ],

@@ -17,9 +17,9 @@ The app deploys to Cloudflare Workers as `keevault-marketing`, with `keevault.my
 
 Cloudflare Workers Builds uses the `rama-adi/keevault` repository with the repository root as its build path. Set `SKIP_DEPENDENCY_INSTALL=true` and use these commands:
 
-- Build: `npx --yes pnpm@11.25.0 install --frozen-lockfile && npx vp run keevault-marketing#build`
-- Deploy: `npx wrangler deploy --config apps/keevault-marketing/dist/server/wrangler.json`
-- Preview branches: `npx wrangler versions upload --config apps/keevault-marketing/dist/server/wrangler.json`
+- Build: `npx --yes --force pnpm@11.25.0 install --frozen-lockfile && ./node_modules/.bin/vp run keevault-marketing#build`
+- Deploy: `./apps/keevault-marketing/node_modules/.bin/wrangler deploy --config apps/keevault-marketing/dist/server/wrangler.json`
+- Preview branches: `./apps/keevault-marketing/node_modules/.bin/wrangler versions upload --config apps/keevault-marketing/dist/server/wrangler.json`
 
 For a manual deployment from the repository root, run `vp run keevault-marketing#deploy`.
 
