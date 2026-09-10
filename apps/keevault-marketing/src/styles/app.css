@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/shadcn.css";
 @import "fumadocs-ui/css/preset.css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
@@ -31,6 +31,24 @@
   --muted-foreground: #94a2ae;
   --border: #233039;
   --radius: 0.5rem;
+  --muted: #101a22;
+  --card: #0d151b;
+  --card-foreground: var(--foreground);
+  --popover: #101a22;
+  --popover-foreground: var(--foreground);
+  --secondary-foreground: var(--foreground);
+  --accent: #19332e;
+  --accent-foreground: var(--primary);
+  --ring: var(--primary);
+  --destructive: #fb7185;
+  --sidebar: #0b1219;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-ring: var(--primary);
+  --fd-layout-width: 1440px;
 }
 html {
   scroll-behavior: smooth;
@@ -1013,5 +1031,219 @@ body {
   .marketing-site *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Fumadocs uses the same palette and type families as the homepage. */
+.docs-site {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+.docs-site .wordmark {
+  font-size: 23px;
+}
+.docs-site .brand-icon {
+  width: 25px;
+  margin-right: 6px;
+}
+.docs-site .brand-icon svg {
+  width: 23px;
+  height: 23px;
+}
+.docs-section-label {
+  margin: 9px 0 5px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.docs-page {
+  background: radial-gradient(ellipse at 65% 0%, #1d44341a, transparent 480px);
+}
+.docs-page-heading {
+  padding-bottom: 28px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.docs-page-heading .eyebrow {
+  margin-bottom: 18px;
+}
+.docs-page-title {
+  font-size: clamp(32px, 4vw, 46px);
+  font-weight: 550;
+  letter-spacing: -1.8px;
+  line-height: 1.15;
+}
+.docs-page-description {
+  max-width: 620px;
+  margin-top: 18px;
+  margin-bottom: 0;
+  font-size: 17px;
+  line-height: 1.75;
+}
+.docs-prose {
+  font-size: 15px;
+  line-height: 1.85;
+}
+.docs-prose :is(h2, h3, h4) {
+  font-weight: 550;
+  letter-spacing: -0.6px;
+}
+.docs-prose h2 {
+  font-size: 25px;
+}
+.docs-prose :is(figure, [data-card]) {
+  border-color: var(--border);
+}
+.docs-prose figure.shiki {
+  background: var(--card);
+  box-shadow: 0 12px 36px #0002;
+}
+.docs-prose pre {
+  font-size: 12px;
+  line-height: 1.9;
+}
+.docs-prose :is(th, td) {
+  min-width: 110px;
+}
+.docs-site :is(a, button):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .docs-page-title {
+    letter-spacing: -1.1px;
+  }
+  .docs-page-description {
+    font-size: 15px;
+  }
+  .docs-prose {
+    font-size: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .docs-site *,
+  .docs-site *::before,
+  .docs-site *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.docs-diagram {
+  padding: 25px;
+  margin-block: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(145deg, var(--card), var(--background));
+}
+.docs-diagram figcaption {
+  color: var(--foreground);
+  font-size: 15px;
+  font-weight: 550;
+  margin: 0 0 24px;
+}
+.docs-diagram .docs-flow-stages {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.docs-flow-stage {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 18px;
+  position: relative;
+  padding: 0 0 26px;
+  margin: 0;
+}
+.docs-flow-stage:last-child {
+  padding-bottom: 0;
+}
+.docs-flow-stage:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 37px;
+  bottom: 1px;
+  left: 17px;
+  width: 1px;
+  background: var(--border);
+}
+.docs-flow-number {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--primary);
+  background: var(--accent);
+  font: 11px var(--font-mono);
+}
+.docs-diagram-label {
+  display: block;
+  font: 9px var(--font-mono);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 7px;
+}
+.docs-flow-stage strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 550;
+}
+.docs-diagram :is(.docs-flow-stage, .docs-boundary-zone) p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--muted-foreground);
+  margin: 7px 0 0;
+}
+.docs-diagram .docs-diagram-note {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin: 22px 0 0;
+  padding-top: 17px;
+  border-top: 1px solid var(--border);
+}
+.docs-boundary-zones {
+  display: grid;
+  grid-template-columns: 1fr 70px 1fr;
+  align-items: start;
+  gap: 17px;
+}
+.docs-boundary-zone h3 {
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0;
+}
+.docs-boundary-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-top: 25px;
+  color: var(--primary);
+  text-align: center;
+  font: 9px/1.8 var(--font-mono);
+}
+.docs-boundary-gate svg {
+  width: 24px;
+  height: 24px;
+}
+@media (max-width: 640px) {
+  .docs-diagram {
+    padding: 19px;
+  }
+  .docs-boundary-zones {
+    grid-template-columns: 1fr;
+    gap: 19px;
+  }
+  .docs-boundary-gate {
+    padding: 0;
+    flex-direction: row;
+  }
+  .docs-boundary-gate svg {
+    transform: rotate(90deg);
   }
 }

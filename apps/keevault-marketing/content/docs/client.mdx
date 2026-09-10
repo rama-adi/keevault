@@ -8,6 +8,44 @@ plane and then replaces itself with your application. The application inherits
 the decrypted secrets as ordinary environment variables. The bootstrap process
 itself is gone by the time the application runs.
 
+## Download and verify the client
+
+On Linux, run this from your application's working directory:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | sh
+```
+
+The script selects the latest release for Linux amd64 or arm64, downloads it
+from GitHub Releases, and compares its SHA-256 hash with the release catalog.
+It saves an executable `./keevault` only after verification succeeds. A failed
+download or hash check leaves an existing binary unchanged.
+
+You need `curl` and either `sha256sum` or `shasum`. Other operating systems and
+architectures are not supported by this downloader.
+
+To choose a version, pass its published tag to the shell running the script:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | KEEVAULT_VER=v1.0.0 sh
+```
+
+Replace `v1.0.0` with a published version. An unset or empty `KEEVAULT_VER`, or
+`KEEVAULT_VER=latest`, selects the highest published SemVer. The version belongs
+to the `sh` process, so put it after the pipe as shown.
+
+To inspect the script before running it:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh -o download-keevault.sh
+# Read download-keevault.sh before continuing.
+sh download-keevault.sh
+```
+
+The hash verifies the binary against the catalog served by the control plane.
+For builds that require an independently reviewed checksum, pin the release URL
+and expected SHA-256 in your build configuration too.
+
 ## Configure your application
 
 Create `keevault.json` in your application's working directory:
@@ -23,8 +61,8 @@ Create `keevault.json` in your application's working directory:
 
 Set `VAULT_BOOTSTRAP_TOKEN` in your deployment's environment, then run:
 
-```bash
-keevault
+```sh
+./keevault
 ```
 
 Keevault reads the application command from the JSON file. To change what runs,

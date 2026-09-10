@@ -10,6 +10,31 @@ The Dockerfile downloads a released static `keevault` binary from GitHub Release
 its SHA-256 against the build argument you supply. It contains no Go build stage.
 The entrypoint reads `keevault.json` and launches `node server.js` after approval.
 
+## Download for a local Linux run
+
+For a quick local run on Linux amd64 or arm64, download the client in this
+example's directory:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | sh
+```
+
+The script selects the latest release for your CPU, verifies SHA-256 against
+the release catalog, and saves executable `./keevault`. It needs `curl` and
+`sha256sum` or `shasum`. To select a published version instead:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | KEEVAULT_VER=v1.0.0 sh
+```
+
+Replace `v1.0.0` with a published tag. With Node installed and `VAULT_URL` and
+`VAULT_BOOTSTRAP_TOKEN` set in your shell, run `./keevault` from this directory.
+It reads `keevault.json` and starts `server.js` after approval.
+
+The production Dockerfile below keeps its explicit release URL and independently
+supplied checksum arguments. The convenient downloader verifies against the
+control plane's catalog instead.
+
 ## Building
 
 From the repository root, publish a release using [the release guide](../../docs/releases.md), then copy its trusted checksums into

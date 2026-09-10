@@ -37,7 +37,7 @@ function Root() {
         <HeadContent />
       </head>
       <body>
-        <RootProvider theme={{ defaultTheme: "dark" }}>
+        <RootProvider theme={{ forcedTheme: "dark" }}>
           <Outlet />
         </RootProvider>
         <Scripts />

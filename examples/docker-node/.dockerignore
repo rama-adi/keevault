@@ -1,5 +1,4 @@
 *
 !Dockerfile
-!keevault
 !keevault.json
 !server.mjs

@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/docs/page";
 import { useFumadocsLoader } from "fumadocs-core/source/client";
+import { LockKeyhole } from "lucide-react";
 import { Suspense, use } from "react";
 import { docs, source } from "@/lib/source";
 import { getMDXComponents } from "@/components/mdx";
@@ -44,10 +45,15 @@ function Content({ path }: { path: string }) {
   const { toc } = use(page.load());
   const MDX = page.body;
   return (
-    <DocsPage toc={toc}>
-      <DocsTitle>{page.title}</DocsTitle>
-      <DocsDescription>{page.description}</DocsDescription>
-      <DocsBody>
+    <DocsPage toc={toc} className="docs-page">
+      <div className="docs-page-heading">
+        <p className="eyebrow">
+          <span className="status-dot" /> KEEVAULT DOCS
+        </p>
+        <DocsTitle className="docs-page-title">{page.title}</DocsTitle>
+        <DocsDescription className="docs-page-description">{page.description}</DocsDescription>
+      </div>
+      <DocsBody className="docs-prose">
         <MDX components={getMDXComponents()} />
       </DocsBody>
     </DocsPage>
@@ -57,7 +63,27 @@ function Content({ path }: { path: string }) {
 function DocumentationPage() {
   const data = useFumadocsLoader(Route.useLoaderData());
   return (
-    <DocsLayout nav={{ title: "KeeVault", url: "/" }} tree={data.pageTree}>
+    <DocsLayout
+      containerProps={{ className: "docs-site" }}
+      nav={{
+        title: (
+          <span className="wordmark">
+            <span className="brand-icon">
+              <LockKeyhole aria-hidden="true" />
+            </span>
+            keevault<span className="wordmark-period">.</span>
+          </span>
+        ),
+        url: "/",
+      }}
+      themeSwitch={{ enabled: false }}
+      sidebar={{ banner: <p className="docs-section-label">Documentation</p> }}
+      links={[
+        { text: "Homepage", url: "/", active: "url" },
+        { text: "Open vault", url: "https://vault.keevault.my.id", external: true },
+      ]}
+      tree={data.pageTree}
+    >
       <Suspense fallback={<p className="p-8">Loading documentation…</p>}>
         <Content path={data.path} />
       </Suspense>

@@ -23,6 +23,24 @@ This is an example contract for your service, not a Keevault API. Add its URL as
 `API_URL` and its bearer token as `API_KEY` in your Keevault environment. Use
 HTTPS outside local testing.
 
+## Download Keevault
+
+On Linux amd64 or arm64, run this in the example's directory:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | sh
+```
+
+The downloader selects your architecture, verifies the release's SHA-256 hash,
+and saves executable `./keevault`. Install `curl` and either `sha256sum` or
+`shasum` first. To pin a published version, use:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | KEEVAULT_VER=v1.0.0 sh
+```
+
+Replace `v1.0.0` with the tag you want. See [download and verification details](/docs/client#download-and-verify-the-client).
+
 ## Configure the worker
 
 Place this `keevault.json` next to `worker.mjs` and replace the vault URL and
@@ -95,8 +113,8 @@ console.log("Heartbeat worker stopped");
 
 Set `VAULT_BOOTSTRAP_TOKEN` in the process environment, then run:
 
-```bash
-keevault
+```sh
+./keevault
 ```
 
 [Approve the boot](/docs/approving-boots) to start the worker. Failed requests

@@ -3,8 +3,7 @@ title: "Getting started"
 description: "Run your application with secrets supplied by Keevault."
 ---
 
-Have your vault URL, environment ID, bootstrap token, and keevault client binary
-ready. You'll also need an admin or owner account to approve the application
+Have your vault URL, environment ID, and bootstrap token ready. You'll also need an admin or owner account to approve the application
 start, or a teammate who can approve it.
 
 ## Prepare the environment
@@ -20,10 +19,30 @@ control and container images.
 
 See [managing secrets](/docs/managing-secrets) for environment and token settings.
 
+## Download the client
+
+From your application's working directory on Linux:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | sh
+```
+
+This downloads the latest release for your CPU architecture, checks its SHA-256
+hash, and saves executable `./keevault`. It supports Linux amd64 and arm64 and
+requires `curl` plus `sha256sum` or `shasum`.
+
+To select a published version instead:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | KEEVAULT_VER=v1.0.0 sh
+```
+
+Replace `v1.0.0` with your release tag. See [client configuration](/docs/client#download-and-verify-the-client)
+for verification details and how to inspect the script first.
+
 ## Configure the command
 
-Install the keevault client so that it is executable and available on your
-application's `PATH`. Add `keevault.json` to the application's working directory:
+Add `keevault.json` to the application's working directory:
 
 ```json
 {
@@ -43,8 +62,8 @@ still receives all secrets in that environment.
 
 With `VAULT_BOOTSTRAP_TOKEN` set in the process environment, run:
 
-```bash
-keevault
+```sh
+./keevault
 ```
 
 The client reads the config from the working directory and waits for approval.

@@ -11,26 +11,23 @@ You'll need Docker, a reachable Keevault URL, an environment containing
 `API_KEY`, and a bootstrap token for that environment. Someone with admin or
 owner access must approve the boot.
 
-## Add the client to your project
+## Prepare the files
 
-Get a trusted Linux Keevault binary for your container's architecture and save
-it as `keevault` beside your Dockerfile. Use the `arm64` binary for a
-`linux/arm64` image or `amd64` for `linux/amd64`. A macOS binary won't run in
-Docker. Verify the binary against the checksum supplied with your release.
+The Dockerfile below downloads Keevault inside the Linux build stage. The
+`/download.sh` endpoint selects amd64 or arm64 to match that stage, verifies the
+SHA-256 hash, and saves the executable. This also works when your host is macOS.
 
-Your directory should contain:
+Create these files in one directory:
 
-```text
-my-app/
-  Dockerfile
-  .dockerignore
-  keevault
-  keevault.json
-  server.mjs
-```
+| File            | Purpose                                                  |
+| --------------- | -------------------------------------------------------- |
+| `Dockerfile`    | Download the client and build the application image.     |
+| `.dockerignore` | Limit the build context to the application files.        |
+| `keevault.json` | Configure the vault environment and application command. |
+| `server.mjs`    | Run the example HTTP server.                             |
 
-A copy of this example lives in the repository at `examples/docker-node`.
-Its README also explains how to build the Linux client from source.
+The runnable example lives at `examples/docker-node` in the repository and
+uses this download stage.
 
 ## Set the launch config
 
@@ -75,12 +72,21 @@ file, for example `"command": ["npm", "run", "start"]`.
 ## Build the image
 
 ```dockerfile title="Dockerfile"
+FROM debian:bookworm-slim AS keevault-download
+ARG KEEVAULT_VER=latest
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /download
+RUN curl -fsSL https://vault.keevault.my.id/download.sh -o download.sh \
+    && KEEVAULT_VER="$KEEVAULT_VER" sh download.sh
+
 FROM node:22-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --chmod=755 keevault /usr/local/bin/keevault
+COPY --from=keevault-download /download/keevault /usr/local/bin/keevault
 COPY server.mjs keevault.json ./
 USER node
 EXPOSE 3000
@@ -96,7 +102,6 @@ Only include the example's files in the build context:
 ```text title=".dockerignore"
 *
 !Dockerfile
-!keevault
 !keevault.json
 !server.mjs
 ```
@@ -106,6 +111,23 @@ Build from this directory:
 ```sh
 docker build -t keevault-node-example .
 ```
+
+The default downloads the latest release when the download layer runs. To
+select a published tag, pass it as a build argument:
+
+```sh
+docker build --build-arg KEEVAULT_VER=v1.0.0 -t keevault-node-example .
+```
+
+Replace `v1.0.0` with a published release. Docker can reuse a cached download
+layer, so use `--no-cache` when you want a fresh lookup of `latest`. For a
+cross-platform image, add `--platform=linux/amd64` or `--platform=linux/arm64`;
+the download stage must run for that target and may require emulation.
+
+The downloader checks the hash published by the control plane. If your release
+process requires an independently reviewed checksum, also pin that expected
+SHA-256 and the GitHub release asset URL in your build configuration. Keep the
+checksum under review alongside version changes.
 
 ## Run and approve
 
