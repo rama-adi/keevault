@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "keevault-marketing",
+  "main": "@tanstack/react-start/server-entry",
+  "compatibility_date": "2026-09-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [{ "pattern": "keevault.my.id", "custom_domain": true }],
+  "observability": { "enabled": true },
+}

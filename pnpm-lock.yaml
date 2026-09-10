@@ -205,6 +205,9 @@ settings:
 
 catalogs:
   default:
+    '@cloudflare/vite-plugin':
+      specifier: 1.54.4
+      version: 1.54.4
     '@oxlint/plugins':
       specifier: 1.79.0
       version: 1.79.0
@@ -229,6 +232,9 @@ catalogs:
     vite-plus:
       specifier: 0.3.0
       version: 0.3.0
+    wrangler:
+      specifier: 4.129.0
+      version: 4.129.0
 
 overrides:
   vite@*: npm:@voidzero-dev/vite-plus-core@0.3.0
@@ -380,6 +386,9 @@ importers:
         specifier: 19.2.8
         version: 19.2.8(react@19.2.8)
     devDependencies:
+      '@cloudflare/vite-plugin':
+        specifier: 'catalog:'
+        version: 1.54.4(@voidzero-dev/vite-plus-core@0.3.0(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(wrangler@4.129.0(@cloudflare/workers-types@5.20260905.1))
       '@tailwindcss/vite':
         specifier: 4.3.3
         version: 4.3.3(@voidzero-dev/vite-plus-core@0.3.0(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))
@@ -416,6 +425,9 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 0.3.0(@types/node@24.13.3)(@voidzero-dev/vite-plus-core@0.3.0(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(esbuild@0.28.2)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
+      wrangler:
+        specifier: 'catalog:'
+        version: 4.129.0(@cloudflare/workers-types@5.20260905.1)
 
   packages/crypto:
     devDependencies:
