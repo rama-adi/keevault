@@ -1,0 +1,6 @@
+{
+  "vaultUrl": "https://vault.keevault.my.id",
+  "environmentId": "env_01M24MPYYQWKX1WYK0H2V31F90",
+  "requiredSecrets": ["KEEVAULT_RELEASE_KEY"],
+  "command": ["node", "scripts/register-release.mjs"]
+}

@@ -12,6 +12,7 @@
   // .dev.vars for local development. See .dev.vars.example.
   //   VAULT_MASTER_KEY_V1   32 random bytes, base64url, wraps project keys
   //   BETTER_AUTH_SECRET    Better Auth signing secret
+  //   KEEVAULT_RELEASE_KEY shared release registration key
   //   VAULT_SETUP_TOKEN     one-time token gating the /setup ceremony
   "vars": {
     "VAULT_MASTER_KEY_ACTIVE_VERSION": "1",

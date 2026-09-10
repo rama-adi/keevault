@@ -50,9 +50,10 @@ and execs the configured command. See [client configuration](../apps/env-client/
 for field validation and overrides.
 
 Release CI compiles Linux amd64 and arm64 binaries once, then uploads versioned
-artifacts to R2. The example Docker build downloads the selected binary and checks
-a pinned SHA-256 value. R2 is needed during image construction, not workload boot.
-This repository contains the publication workflow; it does not provision the bucket.
+artifacts to GitHub Releases. The example Docker build downloads the selected binary and checks
+a pinned SHA-256 value. Downloads happen during image construction.
+CI bootstraps through keevault and authenticates release registration with a shared
+Worker secret. `/binary.json` reads the release catalog from D1.
 See [releases](./releases.md).
 
 ## Known consistency limits

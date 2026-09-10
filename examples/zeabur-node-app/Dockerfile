@@ -17,7 +17,7 @@ RUN set -eu; \
     echo "$checksum" | grep -Eq '^[a-fA-F0-9]{64}$'; \
     curl --fail --show-error --silent --location --proto '=https' --proto-redir '=https' \
       --retry 3 --connect-timeout 10 --max-time 120 \
-      "${KEEVAULT_RELEASE_URL%/}/releases/${KEEVAULT_VERSION}/keevault-linux-${TARGETARCH}" -o /keevault; \
+      "${KEEVAULT_RELEASE_URL%/}/releases/download/${KEEVAULT_VERSION}/keevault-linux-${TARGETARCH}" -o /keevault; \
     echo "$checksum  /keevault" | sha256sum -c -; \
     chmod 0755 /keevault
 

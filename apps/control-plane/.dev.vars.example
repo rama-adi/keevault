@@ -18,3 +18,6 @@ VAULT_SETUP_TOKEN=""
 # entry, which is built only when VAULT_E2E=1. At least 16 characters.
 # Generate: openssl rand -base64 32
 VAULT_E2E_SECRET=""
+
+# Must match the release environment secret retrieved by CI through keevault.
+KEEVAULT_RELEASE_KEY=""

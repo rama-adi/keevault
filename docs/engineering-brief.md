@@ -20,7 +20,7 @@ Implemented and covered by tests:
 Recent client and audit changes:
 
 - `keevault.json` configures `vaultUrl`, an expected `environmentId`, `requiredSecrets`, and command argv. The token still selects the environment; local checks run before acknowledgement. See [client configuration](../apps/env-client/README.md).
-- Release CI builds static Linux amd64 and arm64 binaries and can publish them to R2. The Docker example downloads a version and verifies a pinned checksum at image build time. R2 infrastructure and credentials must be configured before publication.
+- Release CI builds static Linux amd64 and arm64 binaries and publishes them to GitHub Releases. The Docker example downloads a version and verifies a pinned checksum at image build time. CI retrieves the release registration key through keevault, then registers both architectures in the D1-backed `/binary.json` catalog. The Worker secret and CI bootstrap token must be configured before publication.
 - Secret writes reject stale versions, malformed CIDR policies fail closed, and setup sessions have no passkey step-up timestamp. Rotation/write concurrency and initial-owner claim atomicity remain unresolved. See [the audit](./audit-2026-09-09.md).
 - Local end-to-end tests passed for approval, reconnect, decline, and token revocation. These do not exercise Zeabur or browser passkey authentication.
 

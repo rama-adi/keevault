@@ -21,6 +21,10 @@ jobs:
         run: |
           go vet ./...
           go test ./...
+      - name: Validate release tag
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: node scripts/validate-release-version.mjs
       - name: Build static binaries
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
@@ -36,34 +40,40 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: releases
+    timeout-minutes: 35
+    permissions:
+      contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: keevault-${{ github.ref_name }}
           path: dist
-      - name: Publish versioned artifacts to R2
+      - name: Publish GitHub release
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ github.ref_name }}
-          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
-          R2_BUCKET: ${{ vars.R2_BUCKET }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
-          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
         run: |
           set -euo pipefail
-          [[ "$RELEASE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]] || { echo 'Expected a version tag such as v1.0.0'; exit 1; }
-          : "${R2_ACCOUNT_ID:?Configure R2_ACCOUNT_ID}"
-          : "${R2_BUCKET:?Configure R2_BUCKET}"
-          : "${AWS_ACCESS_KEY_ID:?Configure R2_ACCESS_KEY_ID}"
-          : "${AWS_SECRET_ACCESS_KEY:?Configure R2_SECRET_ACCESS_KEY}"
-          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-          prefix="releases/${RELEASE_VERSION}/"
-          existing=$(aws s3api list-objects-v2 --endpoint-url "$endpoint" --bucket "$R2_BUCKET" --prefix "$prefix" --max-keys 1 --query KeyCount --output text)
-          [[ "$existing" == 0 ]] || { echo 'Version already exists; publish a new tag'; exit 1; }
           cd dist
           sha256sum --check SHA256SUMS
-          for file in keevault-linux-amd64 keevault-linux-arm64 SHA256SUMS; do
-            aws s3 cp "$file" "s3://${R2_BUCKET}/${prefix}${file}" --endpoint-url "$endpoint" --cache-control 'public,max-age=31536000,immutable' --only-show-errors
-          done
+          if gh release view "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            mkdir existing
+            gh release download "$RELEASE_VERSION" --repo "$GITHUB_REPOSITORY" --dir existing
+            for file in keevault-linux-amd64 keevault-linux-arm64 SHA256SUMS; do
+              cmp "$file" "existing/$file"
+            done
+          else
+            gh release create "$RELEASE_VERSION" keevault-linux-amd64 keevault-linux-arm64 SHA256SUMS \
+              --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+          fi
+      - name: Bootstrap release registration through keevault
+        env:
+          VAULT_BOOTSTRAP_TOKEN: ${{ secrets.VAULT_BOOTSTRAP_TOKEN }}
+          VAULT_PENDING_TIMEOUT: 30m
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          : "${VAULT_BOOTSTRAP_TOKEN:?Configure the releases environment bootstrap token}"
+          chmod +x dist/keevault-linux-amd64
+          dist/keevault-linux-amd64 --config scripts/release.keevault.json

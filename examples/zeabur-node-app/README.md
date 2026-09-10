@@ -6,7 +6,7 @@ answers `GET /healthz` with `200 ok`, and answers `GET /` with a JSON object
 listing the names of every environment variable starting
 with `APP_`, plus the process uptime. It never returns their values.
 
-The Dockerfile downloads a released static `keevault` binary from R2 and verifies
+The Dockerfile downloads a released static `keevault` binary from GitHub Releases and verifies
 its SHA-256 against the build argument you supply. It contains no Go build stage.
 The entrypoint reads `keevault.json` and launches `node server.js` after approval.
 
@@ -17,7 +17,7 @@ your build configuration. Replace these placeholders before running:
 
 ```bash
 docker build -f examples/zeabur-node-app/Dockerfile \
-  --build-arg KEEVAULT_RELEASE_URL=https://downloads.example.com \
+  --build-arg KEEVAULT_RELEASE_URL=https://github.com/rama-adi/keevault \
   --build-arg KEEVAULT_VERSION=v1.0.0 \
   --build-arg KEEVAULT_SHA256_AMD64='REPLACE_WITH_AMD64_SHA256' \
   --build-arg KEEVAULT_SHA256_ARM64='REPLACE_WITH_ARM64_SHA256' \

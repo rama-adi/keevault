@@ -1,89 +1,84 @@
 # Releasing the keevault binary
 
-Build the client once in CI and let workload images download it from R2. This
-keeps Go out of application builds and gives each deployment a version and
-checksum it can review and pin. Download at image build time so a running
-container does not depend on R2 being available when it boots.
+CI builds static Linux amd64 and arm64 clients, uploads them and `SHA256SUMS`
+to a GitHub release, then runs the built amd64 client to retrieve
+`KEEVAULT_RELEASE_KEY` from keevault. After approval, the client launches the
+registration script with that secret in its environment.
 
-## Set up distribution
+## Setup
 
-Create a dedicated R2 bucket for public binaries, then attach a public custom
-domain such as `downloads.example.com`. Cloudflare recommends the custom-domain
-path for production rather than the rate-limited `r2.dev` development URL.
-See [public bucket configuration](https://developers.cloudflare.com/r2/buckets/public-buckets/).
+Apply the vault D1 migrations before publishing:
 
-Create R2 S3 credentials scoped to this bucket with object read and write
-permissions. The workflow uses the AWS CLI with the R2 S3 endpoint, as described
-in [Cloudflare's S3 setup](https://developers.cloudflare.com/r2/get-started/s3/).
+```bash
+vp run control-plane#db:migrate:remote
+```
 
-Create a GitHub environment named `releases`. Configure these values there:
+Store `KEEVAULT_RELEASE_KEY` as a Cloudflare Worker secret and store the same
+value in keevault environment `env_01M24MPYYQWKX1WYK0H2V31F90`.
+Create a bootstrap token for that environment and save it as
+`VAULT_BOOTSTRAP_TOKEN` in the GitHub `releases` environment. The release key
+itself stays in keevault and Cloudflare. The job waits up to 30 minutes for boot
+approval. Its config is `scripts/release.keevault.json`.
 
-| Kind     | Name                   | Value                   |
-| -------- | ---------------------- | ----------------------- |
-| Variable | `R2_ACCOUNT_ID`        | Cloudflare account ID   |
-| Variable | `R2_BUCKET`            | Release bucket name     |
-| Secret   | `R2_ACCESS_KEY_ID`     | R2 S3 access key ID     |
-| Secret   | `R2_SECRET_ACCESS_KEY` | R2 S3 secret access key |
-
-Protect release tags and restrict who can publish to this environment. No R2
-credentials belong in Docker build arguments, workload variables, or the repo.
-The workflow does not provision the bucket, credentials, or public domain.
+The GitHub repository must be public for anonymous binary downloads. The job
+uses its GitHub token with `contents: write` to upload assets. R2 credentials,
+buckets, and bindings are no longer required.
 
 ## Publish
 
-Push a version tag such as `v1.0.0`. Publication accepts `vMAJOR.MINOR.PATCH`
-with an optional prerelease suffix containing letters, digits, dots, or hyphens.
-Build metadata with `+` is not accepted. Other tags starting with `v` still trigger
-the build job but fail version validation before publication. `.github/workflows/release-client.yml` runs Go
-vet and tests, builds static Linux amd64 and arm64 clients, and retains them as
-a GitHub Actions artifact before publishing to R2:
+Push a SemVer tag such as `v1.0.0` or `v1.1.0-rc.1`. Build metadata is not
+accepted. Approve the release job's boot in keevault when it appears. CI posts
+both architectures to `/binary.json` using `Authorization: Bearer <release key>`.
+The database registers both binaries in one transaction. Repeating the same
+publication is safe; changing an existing version's URL or hash returns 409.
 
-```text
-releases/v1.0.0/keevault-linux-amd64
-releases/v1.0.0/keevault-linux-arm64
-releases/v1.0.0/SHA256SUMS
+If registration fails after the GitHub release is published, rerun the job.
+It checks existing assets against the build artifacts before registering them.
+A partial GitHub upload requires repairing the release before retrying.
+Never move a published tag or replace its binaries.
+
+## Binary catalog
+
+`GET https://vault.keevault.my.id/binary.json` is public and reads D1 directly:
+
+```json
+{
+  "latest": "v1.0.0",
+  "binaries": [
+    {
+      "id": "generated-uuid",
+      "version": "v1.0.0",
+      "arch": "amd64",
+      "hash": "64-character-lowercase-sha256",
+      "createdat": "2026-09-10T00:00:00.000Z",
+      "url": "https://github.com/rama-adi/keevault/releases/download/v1.0.0/keevault-linux-amd64"
+    }
+  ]
+}
 ```
 
-The workflow rejects a version prefix that already contains objects. A partial
-upload therefore needs operator cleanup before retrying, or a new version tag.
-This check prevents routine overwrites; bucket access policies still control
-other writers. Never move a published tag or replace its binaries.
+The actual catalog includes both architectures for every published version.
+`latest` is the highest SemVer, including prereleases, and is `null` before the
+first publication. A stable version sorts above its own prereleases. Publishing
+an older version later never moves latest backwards. Clients select their
+architecture and the version matching `latest`, then download the direct URL.
+The endpoint performs no GitHub API calls. Hashes are supplied by trusted CI;
+the control plane does not independently download or attest the binaries.
 
-To build and inspect artifacts locally without publishing, run from the repository
-root with Go 1.26 or newer. This script builds binaries and checksums; it does
-not run vet or tests:
+## Build and consume
+
+To build locally without publishing:
 
 ```bash
-bash scripts/build-release.sh
-cat apps/env-client/dist/SHA256SUMS
+RELEASE_VERSION=v1.0.0 bash scripts/build-release.sh
 ```
 
-Set `RELEASE_VERSION=v1.0.0` when building a versioned artifact locally. CI sets
-this from the release tag. Builds without it report `dev`. The client hashes its
-executable file at startup and sends the digest, version, OS, and architecture
-as untrusted claims. Hashing failures leave the digest absent and do not block
-boot. The approval screen labels the report accordingly; no release-catalog
-comparison or runtime verification is performed.
+The example in `examples/zeabur-node-app` downloads a pinned GitHub release at
+image build time. Set `KEEVAULT_RELEASE_URL=https://github.com/rama-adi/keevault`,
+`KEEVAULT_VERSION`, and the architecture-specific `KEEVAULT_SHA256_AMD64` and
+`KEEVAULT_SHA256_ARM64` values from reviewed build artifacts. Pinning the hash
+separately makes replacement binaries fail verification.
 
 Deploy the updated control plane before distributing reporting clients. Older
-clients remain accepted by the new server, but the old server's closed claims
-schema rejects the new `claims.client` field. The protocol number remains v1.
-
-## Consume a release
-
-Use the example Dockerfile in `examples/zeabur-node-app`. Set
-`KEEVAULT_RELEASE_URL` to the HTTPS custom-domain origin and `KEEVAULT_VERSION`
-to the version tag. Pin `KEEVAULT_SHA256_AMD64` and `KEEVAULT_SHA256_ARM64` in
-reviewed build configuration using the CI artifact's checksum manifest.
-Only the target platform's checksum is required for a single-platform build.
-
-Do not fetch a checksum from R2 during the Docker build and trust it alongside
-the binary. A pinned checksum makes a modified binary fail even if someone
-replaces both the public binary and its checksum file. It does not establish
-trust in the original build; protect CI and review releases before pinning.
-
-The image build fails for missing checksums, unknown architectures, non-HTTPS
-URLs, malformed versions, failed downloads, or checksum mismatches. The final
-image copies only the client binary from the download stage alongside the Node
-app. The Node base image still supplies its own utilities, including the `wget`
-used by the Docker health check.
+clients remain accepted, but older servers may reject the `claims.client`
+field. Client version and executable digest claims remain untrusted reports.

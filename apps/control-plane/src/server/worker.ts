@@ -1,3 +1,5 @@
+import { handleBinaryRequest } from "./releases/catalog.ts";
+
 import handler from "@tanstack/react-start/server-entry";
 
 import { handleBootstrapRequest, isBootstrapRequest } from "./bootstrap/upgrade.ts";
@@ -7,6 +9,7 @@ export { EnvironmentSessionDO } from "./durable-objects/environment-session.ts";
 
 export default {
   fetch(request: Request, env: Env): Response | Promise<Response> {
+    if (new URL(request.url).pathname === "/binary.json") return handleBinaryRequest(request, env);
     // The machine protocol is handled before the dashboard: it authenticates
     // with a bootstrap token, not a session cookie, and it never renders a page.
     if (isBootstrapRequest(new URL(request.url))) {

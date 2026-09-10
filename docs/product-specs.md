@@ -7,7 +7,7 @@ feature or launch criterion is complete. The [engineering brief](./engineering-b
 tracks implementation, and the [latest audit](./audit-2026-09-09.md) records fixes
 and open findings.
 
-As of 2026-09-09, client configuration and the R2 publication workflow are
+As of 2026-09-10, client configuration and the GitHub release publication workflow are
 implemented. Additional administrator invitations are not implemented. First-owner
 creation is not atomic, and key rotation can race secret writes. Passkey step-up
 is granted only after authentication, not during setup. The approval credential
@@ -235,8 +235,8 @@ COPY keevault.json ./keevault.json
 ENTRYPOINT ["/usr/local/bin/keevault"]
 ```
 
-The example image downloads a precompiled Linux binary from a versioned R2
-path during image build and verifies a pinned checksum. CI produces amd64 and
+The example image downloads a precompiled Linux binary from a versioned GitHub release
+URL during image build and verifies a pinned checksum. CI produces amd64 and
 arm64 artifacts. See [release setup](releases.md).
 
 After approval and server confirmation of consumption, the bootstrapper executes

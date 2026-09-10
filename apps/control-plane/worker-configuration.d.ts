@@ -9,6 +9,7 @@ interface __BaseEnv_Env {
   VAULT_MASTER_KEY_V1: string;
   BETTER_AUTH_SECRET: string;
   VAULT_SETUP_TOKEN: string;
+  KEEVAULT_RELEASE_KEY?: string;
   ENVIRONMENT_SESSION: DurableObjectNamespace<import("./src/server/worker").EnvironmentSessionDO>;
 }
 declare namespace Cloudflare {

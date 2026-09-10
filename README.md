@@ -75,11 +75,12 @@ Put the application command in `keevault.json` and run `keevault` without
 command arguments. Use `--config path/to/keevault.json` to select another file.
 See [client configuration](apps/keevault-marketing/content/docs/client.mdx).
 
-Container builds download a precompiled Linux binary from R2 and verify a pinned
+Container builds download a precompiled Linux binary from GitHub Releases and verify a pinned
 SHA-256 checksum. They do not need a Go toolchain. Releases provide `amd64` and
 `arm64` binaries under versioned paths. See [release setup](docs/releases.md) and
-the [example Dockerfile](examples/zeabur-node-app/Dockerfile). R2 publication needs
-your bucket, public download domain, and CI credentials before the first release.
+the [example Dockerfile](examples/zeabur-node-app/Dockerfile). The control plane
+serves a database-backed `/binary.json` catalog. CI retrieves its registration key
+through keevault; see release setup for the bootstrap token and Worker secret.
 
 ## Quick start for developers
 
