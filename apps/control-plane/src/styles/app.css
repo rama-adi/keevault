@@ -5,13 +5,13 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
+  --background: oklch(0.985 0.003 250);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.43 0.13 255);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -22,18 +22,18 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.55 0.13 255);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: oklch(0.965 0.005 250);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent: oklch(0.925 0.025 255);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
@@ -117,5 +117,37 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Product header derived from Card, without a second container around the page title. */
+.vault-page-header {
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+  padding: 0;
+  box-shadow: none;
+}
+.vault-page-header [data-slot="card-header"] {
+  padding: 0;
+  gap: 0.5rem;
+}
+.vault-page-header h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.2;
+}
+.vault-page-header [data-slot="card-description"] {
+  max-width: 42rem;
+}
+@media (max-width: 640px) {
+  .vault-page-header [data-slot="card-header"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .vault-page-header [data-slot="card-action"] {
+    flex-wrap: wrap;
   }
 }

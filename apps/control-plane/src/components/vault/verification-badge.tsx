@@ -12,11 +12,11 @@ import { cn } from "cn";
  */
 
 const verificationBadgeVariants = cva(
-  "inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 rounded-4xl border px-2 py-0.5 font-mono text-xs font-medium tracking-tight whitespace-nowrap",
+  "inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
   {
     variants: {
       tone: {
-        verified: "border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+        verified: "border-primary/20 bg-primary/10 text-primary",
         failed: "border-destructive bg-destructive/15 text-destructive",
         unverified: "border-border bg-muted text-muted-foreground",
         unavailable: "border-dashed border-border bg-transparent text-muted-foreground",

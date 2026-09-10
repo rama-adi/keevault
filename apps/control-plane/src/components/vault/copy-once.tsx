@@ -29,7 +29,7 @@ export function CopyOnce({ title, description, value, className }: CopyOnceProps
   }
 
   return (
-    <Alert className={cn("border-amber-500/40 bg-amber-500/5", className)}>
+    <Alert className={cn("border-primary/20 bg-muted/40", className)}>
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription className="flex flex-col gap-3">
         <span>{description}</span>
@@ -45,8 +45,8 @@ export function CopyOnce({ title, description, value, className }: CopyOnceProps
             void copy();
           }}
         >
-          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          {copied ? "Copied" : "Copy"}
+          {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
+          {copied ? "Copied" : "Copy to clipboard"}
         </Button>
       </AlertDescription>
     </Alert>

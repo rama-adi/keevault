@@ -68,6 +68,17 @@ function AuditPage() {
 
   const selectedProject = filters.find((entry) => entry.project.id === search.projectId);
 
+  function scopeLabel(event: AuditEventView) {
+    for (const entry of filters) {
+      const environment = entry.environments.find((item) => item.id === event.environmentId);
+      if (environment) return `${entry.project.name} / ${environment.name}`;
+      if (entry.project.id === event.projectId && event.environmentId === null) {
+        return entry.project.name;
+      }
+    }
+    return event.environmentId ?? event.projectId ?? "Vault";
+  }
+
   function navigate(next: AuditSearch) {
     void router.navigate({ to: "/audit", search: next });
   }
@@ -75,8 +86,8 @@ function AuditPage() {
   return (
     <div className="flex flex-col gap-6">
       <VaultPageHeader
-        title="Audit"
-        description="Every vault mutation, newest first. Metadata holds identifiers, fingerprints and counts, never a value."
+        title="Audit log"
+        description="Changes to your vault, newest first."
         role={viewer.role}
       />
 
@@ -152,7 +163,9 @@ function AuditPage() {
                 <TableHead>Action</TableHead>
                 <TableHead>Actor</TableHead>
                 <TableHead>Scope</TableHead>
-                <TableHead className="w-24" />
+                <TableHead className="w-24">
+                  <span className="sr-only">Details</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -176,12 +189,13 @@ function AuditPage() {
                     {event.actorId === null ? "" : ` ${event.actorId}`}
                   </TableCell>
                   <TableCell className="text-muted-foreground font-mono text-xs">
-                    {event.environmentId ?? event.projectId ?? "-"}
+                    {scopeLabel(event)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
                       size="sm"
                       variant="ghost"
+                      aria-expanded={expanded === event.id}
                       onClick={() => {
                         setExpanded(expanded === event.id ? null : event.id);
                       }}

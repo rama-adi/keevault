@@ -40,13 +40,16 @@ export const Route = createFileRoute("/projects/")({
 function ProjectsPage() {
   const { viewer, projects } = Route.useLoaderData();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filteredProjects = projects.filter((project) =>
+    `${project.name} ${project.slug}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
 
   return (
-    <div>
+    <div className="flex flex-col gap-6">
       <VaultPageHeader
         title="Projects"
-        description={`Signed in as ${viewer.name}.`}
-        role={viewer.role}
+        description={`${projects.length} projects`}
         actions={
           canEdit(viewer.role) ? (
             <Button
@@ -55,17 +58,25 @@ function ProjectsPage() {
                 setOpen(true);
               }}
             >
-              <Plus className="size-4" />
+              <Plus data-icon="inline-start" />
               New project
             </Button>
           ) : undefined
         }
       />
-      {projects.length === 0 ? (
+      <Input
+        aria-label="Search projects"
+        placeholder="Search projects…"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        className="max-w-sm"
+      />
+      {filteredProjects.length === 0 ? (
         <Card>
           <CardContent className="text-muted-foreground text-sm">
-            No projects yet. A project holds its own key, and every environment under it holds
-            another.
+            {projects.length === 0
+              ? "Create your first project to add environments and secrets."
+              : "No projects match your search."}
           </CardContent>
         </Card>
       ) : (
@@ -74,13 +85,12 @@ function ProjectsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Project</TableHead>
-                <TableHead>Slug</TableHead>
                 <TableHead className="text-right">Key version</TableHead>
                 <TableHead className="text-right">Created</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <TableRow key={project.id}>
                   <TableCell className="font-medium">
                     <Link
@@ -90,9 +100,7 @@ function ProjectsPage() {
                     >
                       {project.name}
                     </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-xs">
-                    {project.slug}
+                    <p className="text-muted-foreground mt-1 font-mono text-xs">{project.slug}</p>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {project.projectKeyVersion}
@@ -141,7 +149,6 @@ function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
         open={open}
         onOpenChange={onOpenChange}
         title="New project"
-        description="A project groups environments and owns the key that wraps their keys."
         submitLabel="Create project"
         pendingLabel="Creating"
         pending={action.pending}

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { VaultAlert, VaultAlertDescription } from "@/components/vault/vault-alert";
 import { VaultPageHeader } from "@/components/vault/vault-page-header";
-import { VerificationBadge, toneForStatus } from "@/components/vault/verification-badge";
+import { VerificationBadge } from "@/components/vault/verification-badge";
 import { relativeAge } from "@/lib/relative-age";
 import { loadOrRedirect } from "@/lib/route-guards";
 import { listPendingBootsFn, type PendingBootGroup } from "@/server/functions/boots";
@@ -38,21 +38,20 @@ function BootsPage() {
   const total = groups.reduce((count, group) => count + group.boots.length, 0);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <VaultPageHeader
         title="Pending boots"
         description={
           total === 0
-            ? "No workload is waiting for a decision."
-            : `${total} boot ${total === 1 ? "request is" : "requests are"} waiting for a decision.`
+            ? "All caught up."
+            : `${total} boot ${total === 1 ? "request" : "requests"} awaiting review.`
         }
         role={viewer.role}
       />
       {groups.length === 0 ? (
         <Card>
           <CardContent className="text-muted-foreground text-sm">
-            Nothing is waiting. A boot appears here as soon as a workload opens /bootstrap/v1 with a
-            valid bootstrap token.
+            New boot requests will appear here.
           </CardContent>
         </Card>
       ) : (
@@ -70,9 +69,9 @@ function EnvironmentGroup({ group }: { group: PendingBootGroup }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="uppercase">{group.environmentName}</CardTitle>
+        <CardTitle>{group.environmentName}</CardTitle>
         <CardDescription>
-          Project {group.projectName}. Provenance {group.provenanceMode}.
+          {group.projectName} · {group.provenanceMode} provenance
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -84,7 +83,7 @@ function EnvironmentGroup({ group }: { group: PendingBootGroup }) {
               {unusual
                 .map((entry) => `${entry.tokenLabel} has ${entry.count} live boots`)
                 .join(", ")}
-              . One token normally drives one boot at a time.
+              . Expected one live boot per token.
             </VaultAlertDescription>
           </VaultAlert>
         )}
@@ -133,10 +132,6 @@ function EnvironmentGroup({ group }: { group: PendingBootGroup }) {
             ))}
           </TableBody>
         </Table>
-        <p className="text-muted-foreground text-xs">
-          <VerificationBadge tone={toneForStatus("PENDING")}>PENDING</VerificationBadge> means the
-          Durable Object still holds the request. The list is reconciled against it on every load.
-        </p>
       </CardContent>
     </Card>
   );

@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useVaultAction } from "@/components/vault/use-vault-action";
 import { VaultDialog } from "@/components/vault/vault-dialog";
 import { VaultPageHeader } from "@/components/vault/vault-page-header";
@@ -42,7 +42,7 @@ function SettingsPage() {
     <div className="flex flex-col gap-6">
       <VaultPageHeader
         title="Settings"
-        description="Who can operate this vault, and which master key versions the Worker can read."
+        description="Manage access and encryption keys."
         role={settings.viewerRole}
       />
 
@@ -50,8 +50,7 @@ function SettingsPage() {
         <CardHeader className="p-6 pb-0">
           <CardTitle className="text-base">Administrators</CardTitle>
           <CardDescription>
-            Viewers read metadata. Admins edit secrets, tokens and provenance, and approve boots.
-            Owners additionally rotate keys and change roles.
+            {settings.administrators.length} operators with access to this vault.
           </CardDescription>
         </CardHeader>
         <Table>
@@ -98,25 +97,14 @@ function SettingsPage() {
           </TableBody>
         </Table>
         <CardContent className="p-6 pt-0">
-          <Alert>
-            <AlertTitle>Inviting a new operator is not available in V1</AlertTitle>
-            <AlertDescription>
-              Sign-in is passkey only, and Better Auth 1.7.2 can register a passkey only for an
-              already authenticated session. An invited account would have no way to reach its first
-              credential, so the vault would hold a user row nobody can use. Add operators through
-              the first-owner setup ceremony, and change their role here.
-            </AlertDescription>
-          </Alert>
+          <p className="text-muted-foreground text-xs">Invitations are not available yet.</p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Master key versions</CardTitle>
-          <CardDescription>
-            Read from the Worker secrets on every request. Rotating the master key means adding a
-            new secret, rewrapping project keys, and only then moving the active version.
-          </CardDescription>
+          <CardDescription>Active version {settings.activeMasterKeyVersion}.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {settings.masterKeyVersions.map((version) => (
@@ -162,7 +150,7 @@ function ChangeRoleDialog({ administrator, onOpenChange }: ChangeRoleDialogProps
           }
         }}
         title={`Change role for ${administrator?.name ?? ""}`}
-        description="Changing a role asks for a passkey verification from the last five minutes."
+        description="Viewers read metadata. Admins manage secrets and approve boots. Owners also manage roles and keys."
         submitLabel="Save role"
         pendingLabel="Saving"
         pending={action.pending}
@@ -183,21 +171,22 @@ function ChangeRoleDialog({ administrator, onOpenChange }: ChangeRoleDialogProps
             });
         }}
       >
-        <div className="flex gap-2">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={selected}
+          aria-label="Administrator role"
+          onValueChange={(value) => {
+            const nextRole = ROLES.find((option) => option === value);
+            if (nextRole) setRole(nextRole);
+          }}
+        >
           {ROLES.map((option) => (
-            <Button
-              key={option}
-              type="button"
-              size="sm"
-              variant={option === selected ? "default" : "outline"}
-              onClick={() => {
-                setRole(option);
-              }}
-            >
+            <ToggleGroupItem key={option} value={option}>
               {option}
-            </Button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
       </VaultDialog>
       {action.stepUpDialog}
     </>

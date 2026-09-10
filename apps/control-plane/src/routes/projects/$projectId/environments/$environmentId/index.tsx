@@ -87,11 +87,10 @@ function EnvironmentPage() {
   const { projectId } = Route.useParams();
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <VaultPageHeader
         title={environment.name}
-        description={`Environment key version ${environment.environmentKeyVersion}. Provenance ${environment.provenanceMode}.`}
-        role={viewer.role}
+        description={environment.slug}
         actions={
           <Button asChild variant="ghost" size="sm">
             <Link to="/projects/$projectId" params={{ projectId }}>
@@ -102,8 +101,8 @@ function EnvironmentPage() {
       />
       <Tabs defaultValue="secrets">
         <TabsList>
-          <TabsTrigger value="secrets">Secrets</TabsTrigger>
-          <TabsTrigger value="tokens">Tokens</TabsTrigger>
+          <TabsTrigger value="secrets">Secrets · {secrets.length}</TabsTrigger>
+          <TabsTrigger value="tokens">Tokens · {tokens.length}</TabsTrigger>
           <TabsTrigger value="policy">Policy</TabsTrigger>
         </TabsList>
         <TabsContent value="secrets" className="pt-6">
@@ -129,6 +128,10 @@ interface SecretsTabProps {
 function SecretsTab({ environment, secrets, viewer }: SecretsTabProps) {
   const action = useVaultAction();
   const [editing, setEditing] = useState<SecretSummary | null>(null);
+  const [query, setQuery] = useState("");
+  const filteredSecrets = secrets.filter((secret) =>
+    secret.name.toLowerCase().includes(query.trim().toLowerCase()),
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [removing, setRemoving] = useState<SecretSummary | null>(null);
@@ -136,10 +139,14 @@ function SecretsTab({ environment, secrets, viewer }: SecretsTabProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-muted-foreground text-sm">
-          Values are write-only. The dashboard has no way to read one back.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <Input
+          aria-label="Search secrets"
+          placeholder="Search secrets…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          className="max-w-sm"
+        />
         {editable ? (
           <div className="flex gap-2">
             <Button
@@ -149,7 +156,7 @@ function SecretsTab({ environment, secrets, viewer }: SecretsTabProps) {
                 setImportOpen(true);
               }}
             >
-              <Upload className="size-4" />
+              <Upload data-icon="inline-start" />
               Import .env
             </Button>
             <Button
@@ -158,7 +165,7 @@ function SecretsTab({ environment, secrets, viewer }: SecretsTabProps) {
                 setCreateOpen(true);
               }}
             >
-              <Plus className="size-4" />
+              <Plus data-icon="inline-start" />
               New secret
             </Button>
           </div>
@@ -166,9 +173,11 @@ function SecretsTab({ environment, secrets, viewer }: SecretsTabProps) {
       </div>
 
       <Card className="p-0">
-        {secrets.length === 0 ? (
+        {filteredSecrets.length === 0 ? (
           <CardContent className="text-muted-foreground p-6 text-sm">
-            No secrets in this environment yet.
+            {secrets.length === 0
+              ? "Add a secret or import an .env file."
+              : "No secrets match your search."}
           </CardContent>
         ) : (
           <Table>
@@ -182,7 +191,7 @@ function SecretsTab({ environment, secrets, viewer }: SecretsTabProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {secrets.map((secret) => (
+              {filteredSecrets.map((secret) => (
                 <TableRow key={secret.id}>
                   <TableCell className="font-mono text-xs font-medium">{secret.name}</TableCell>
                   <TableCell>
@@ -304,7 +313,7 @@ function SecretDialog({ environmentId, open, existing, onOpenChange }: SecretDia
         open={open}
         onOpenChange={onOpenChange}
         title={replacing ? `Replace ${existing.name}` : "New secret"}
-        description="The value is encrypted under this environment's key and never read back."
+        description="Values cannot be viewed after saving."
         submitLabel={replacing ? "Replace value" : "Create secret"}
         pendingLabel="Saving"
         pending={action.pending}
@@ -378,7 +387,7 @@ function ImportDotenvDialog({ environmentId, open, onOpenChange }: ImportDotenvD
           onOpenChange(next);
         }}
         title="Import .env"
-        description="Every line is parsed, encrypted and stored. Nothing is echoed back."
+        description="Existing secrets with matching names will be replaced."
         submitLabel="Import"
         pendingLabel="Importing"
         pending={action.pending}
@@ -434,9 +443,9 @@ function TokensTab({ environment, tokens, viewer }: TokensTabProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-muted-foreground text-sm">
-          A token belongs to this environment only. The client cannot pick another one.
+          {tokens.filter((token) => token.revokedAt === null).length} active tokens
         </p>
         {editable ? (
           <Button
@@ -445,7 +454,7 @@ function TokensTab({ environment, tokens, viewer }: TokensTabProps) {
               setCreateOpen(true);
             }}
           >
-            <Plus className="size-4" />
+            <Plus data-icon="inline-start" />
             New token
           </Button>
         ) : null}
@@ -607,8 +616,8 @@ function CreateTokenDialog({ environmentId, open, onOpenChange }: CreateTokenDia
         onSubmit={close}
       >
         <CopyOnce
-          title="This is the only time the token is shown"
-          description="It is not stored anywhere. If you lose it, revoke the token and create another."
+          title="Save your token"
+          description="You won't be able to view it again."
           value={issued}
         />
       </VaultDialog>
@@ -623,7 +632,6 @@ function CreateTokenDialog({ environmentId, open, onOpenChange }: CreateTokenDia
           if (!next) close();
         }}
         title="New bootstrap token"
-        description="Creating a token asks for a passkey verification from the last five minutes."
         submitLabel="Create token"
         pendingLabel="Creating"
         pending={action.pending}
@@ -698,7 +706,7 @@ function EditCidrsDialog({ token, onOpenChange }: EditCidrsDialogProps) {
           }
         }}
         title="Allowed CIDRs"
-        description="Checked against CF-Connecting-IP on the WebSocket upgrade."
+        description="Only allow connections from these networks. Leave empty to allow any address."
         submitLabel="Save"
         pendingLabel="Saving"
         pending={action.pending}
@@ -778,8 +786,7 @@ function PolicyTab({ environment, signers, viewer }: PolicyTabProps) {
         <CardHeader>
           <CardTitle className="text-base">Provenance</CardTitle>
           <CardDescription>
-            OFF records nothing. ADVISORY records the verdict and still allows the boot. REQUIRED
-            refuses a boot that is not verified.
+            Required blocks unverified builds. Advisory records the result. Off skips verification.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
@@ -846,9 +853,7 @@ function PolicyTab({ environment, signers, viewer }: PolicyTabProps) {
       <Card className="p-0">
         <CardHeader className="p-6 pb-0">
           <CardTitle className="text-base">Trusted signers</CardTitle>
-          <CardDescription>
-            Ed25519 keys whose signed build manifests this environment accepts.
-          </CardDescription>
+          <CardDescription>Public keys allowed to sign builds.</CardDescription>
         </CardHeader>
         {signers.length === 0 ? (
           <CardContent className="text-muted-foreground p-6 text-sm">
@@ -913,7 +918,7 @@ function PolicyTab({ environment, signers, viewer }: PolicyTabProps) {
                 setSignerOpen(true);
               }}
             >
-              <Plus className="size-4" />
+              <Plus data-icon="inline-start" />
               Add signer
             </Button>
           </CardContent>
@@ -921,19 +926,16 @@ function PolicyTab({ environment, signers, viewer }: PolicyTabProps) {
       </Card>
 
       {editable ? (
-        <Card className="border-destructive/40">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base">Danger zone</CardTitle>
-            <CardDescription>
-              Both operations ask for a passkey verification from the last five minutes.
-            </CardDescription>
+            <CardTitle>Environment settings</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="text-sm">
                 <p className="font-medium">Rotate the environment key</p>
                 <p className="text-muted-foreground">
-                  Every secret is decrypted and re-encrypted under a new key. Owner only.
+                  Key version {environment.environmentKeyVersion}. Only owners can rotate keys.
                 </p>
               </div>
               <Button
@@ -947,12 +949,10 @@ function PolicyTab({ environment, signers, viewer }: PolicyTabProps) {
                 Rotate
               </Button>
             </div>
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="text-sm">
                 <p className="font-medium">Delete this environment</p>
-                <p className="text-muted-foreground">
-                  Removes its key, secrets and bootstrap tokens. This cannot be undone.
-                </p>
+                <p className="text-muted-foreground">Permanently delete all secrets and tokens.</p>
               </div>
               <Button
                 variant="destructive"
@@ -1003,7 +1003,7 @@ function PolicyTab({ environment, signers, viewer }: PolicyTabProps) {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={`Delete ${environment.name}`}
-        description="Type the environment slug to confirm."
+        description="Permanently deletes all secrets and tokens. Type the environment slug to confirm."
         submitLabel="Delete environment"
         pendingLabel="Deleting"
         destructive
@@ -1067,7 +1067,6 @@ function AddSignerDialog({ environmentId, open, onOpenChange }: AddSignerDialogP
         open={open}
         onOpenChange={onOpenChange}
         title="Add a trusted signer"
-        description="The key is checked and fingerprinted before it is stored."
         submitLabel="Add signer"
         pendingLabel="Adding"
         pending={action.pending}

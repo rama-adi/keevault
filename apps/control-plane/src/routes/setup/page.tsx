@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { authClient, SETUP_CLAIM_PATH } from "@/lib/auth-client";
 import { assertSetupOpen } from "@/server/auth/setup";
@@ -59,7 +59,7 @@ function SetupPage() {
     setPending(false);
     if (registration?.error) {
       setError(
-        "The owner account was created but the passkey was not registered. Keep this browser session open while resolving the registration error.",
+        "Your account is ready, but the passkey could not be added. Keep this browser open to finish setup.",
       );
       return;
     }
@@ -68,15 +68,11 @@ function SetupPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create the first owner</CardTitle>
-          <CardDescription>
-            This page works once. Supply the VAULT_SETUP_TOKEN secret, then register the owner
-            passkey. After that the page returns 404 and further administrators are added by the
-            owner.
-          </CardDescription>
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6 py-8 sm:py-12">
+      <Card className="[--card-spacing:--spacing(6)]">
+        <CardHeader className="gap-2">
+          <CardTitle>Set up your vault</CardTitle>
+          <CardDescription>Create your owner account, then add a passkey.</CardDescription>
         </CardHeader>
         <CardContent>
           {error === null ? null : (
@@ -110,13 +106,19 @@ function SetupPage() {
                     type="password"
                     required
                     autoComplete="off"
+                    aria-describedby="setup-token-help"
                   />
+                  <FieldDescription id="setup-token-help">
+                    Use the VAULT_SETUP_TOKEN from your deployment.
+                  </FieldDescription>
                 </Field>
                 <Field orientation="horizontal">
-                  <Button type="submit" disabled={!hydrated || pending || stage === "done"}>
-                    {stage === "passkey"
-                      ? "Registering passkey"
-                      : "Create owner and register passkey"}
+                  <Button
+                    className="w-full"
+                    type="submit"
+                    disabled={!hydrated || pending || stage === "done"}
+                  >
+                    {stage === "passkey" ? "Adding passkey…" : "Create account and add passkey"}
                   </Button>
                 </Field>
               </FieldGroup>

@@ -48,12 +48,18 @@ export function StepUpDialog({ open, onOpenChange, onVerified }: StepUpDialogPro
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Verify with your passkey</DialogTitle>
-          <DialogDescription>
-            This action needs a passkey verification from the last five minutes.
-          </DialogDescription>
+          <DialogDescription>Confirm your identity to continue.</DialogDescription>
         </DialogHeader>
         {error === null ? null : <p className="text-destructive text-sm">{error}</p>}
         <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
           <Button
             type="button"
             disabled={pending}
@@ -61,7 +67,7 @@ export function StepUpDialog({ open, onOpenChange, onVerified }: StepUpDialogPro
               void verify();
             }}
           >
-            {pending ? "Waiting for your passkey" : "Verify"}
+            {pending ? "Waiting for passkey…" : "Verify"}
           </Button>
         </DialogFooter>
       </DialogContent>

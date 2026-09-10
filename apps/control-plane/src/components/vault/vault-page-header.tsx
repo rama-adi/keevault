@@ -37,9 +37,11 @@ export function VaultPageHeader({
   className,
 }: VaultPageHeaderProps) {
   return (
-    <Card className={cn("mb-8 gap-0 border-dashed", className)}>
+    <Card className={cn("vault-page-header mb-8", className)}>
       <CardHeader>
-        <CardTitle className="text-2xl">{title}</CardTitle>
+        <CardTitle>
+          <h1>{title}</h1>
+        </CardTitle>
         {description === undefined ? null : <CardDescription>{description}</CardDescription>}
         {role === undefined && actions === undefined ? null : (
           <CardAction className="flex items-center gap-2">

@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -51,11 +51,10 @@ function ProjectPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <VaultPageHeader
         title={project.name}
-        description={`Slug ${project.slug}. Project key version ${project.projectKeyVersion}.`}
-        role={viewer.role}
+        description={project.slug}
         actions={
           canEdit(viewer.role) ? (
             <Button
@@ -64,7 +63,7 @@ function ProjectPage() {
                 setCreateOpen(true);
               }}
             >
-              <Plus className="size-4" />
+              <Plus data-icon="inline-start" />
               New environment
             </Button>
           ) : undefined
@@ -73,10 +72,7 @@ function ProjectPage() {
 
       <Card className="p-0">
         <CardHeader className="p-6 pb-0">
-          <CardTitle className="text-base">Environments</CardTitle>
-          <CardDescription>
-            Each environment has its own key, its own secrets and its own bootstrap tokens.
-          </CardDescription>
+          <CardTitle>Environments · {environments.length}</CardTitle>
         </CardHeader>
         {environments.length === 0 ? (
           <CardContent className="text-muted-foreground p-6 text-sm">
@@ -87,7 +83,6 @@ function ProjectPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Environment</TableHead>
-                <TableHead>Slug</TableHead>
                 <TableHead>Provenance</TableHead>
                 <TableHead className="text-right">Key version</TableHead>
                 <TableHead className="text-right">Created</TableHead>
@@ -104,9 +99,9 @@ function ProjectPage() {
                     >
                       {environment.name}
                     </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-xs">
-                    {environment.slug}
+                    <p className="text-muted-foreground mt-1 font-mono text-xs">
+                      {environment.slug}
+                    </p>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -172,7 +167,6 @@ function CreateEnvironmentDialog({ open, onOpenChange, projectId }: CreateEnviro
         open={open}
         onOpenChange={onOpenChange}
         title="New environment"
-        description="A fresh environment key is generated and wrapped under this project's key."
         submitLabel="Create environment"
         pendingLabel="Creating"
         pending={action.pending}
@@ -225,20 +219,16 @@ function DangerZone({ project, viewer }: DangerZoneProps) {
 
   return (
     <>
-      <Card className="border-destructive/40">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-base">Danger zone</CardTitle>
-          <CardDescription>
-            Both operations ask for a passkey verification from the last five minutes.
-          </CardDescription>
+          <CardTitle>Project settings</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="text-sm">
               <p className="font-medium">Rotate the project key</p>
               <p className="text-muted-foreground">
-                Every environment key is rewrapped under a new project key. No secret value is
-                touched. Owner only.
+                Key version {project.projectKeyVersion}. Only owners can rotate keys.
               </p>
             </div>
             <Button
@@ -252,12 +242,11 @@ function DangerZone({ project, viewer }: DangerZoneProps) {
               Rotate
             </Button>
           </div>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="text-sm">
               <p className="font-medium">Delete this project</p>
               <p className="text-muted-foreground">
-                Removes every environment, secret and bootstrap token under it. This cannot be
-                undone.
+                Permanently delete all environments, secrets and tokens.
               </p>
             </div>
             <Button
@@ -302,7 +291,7 @@ function DangerZone({ project, viewer }: DangerZoneProps) {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={`Delete ${project.name}`}
-        description="Type the project slug to confirm."
+        description="Permanently deletes all environments, secrets and tokens. Type the project slug to confirm."
         submitLabel="Delete project"
         pendingLabel="Deleting"
         destructive

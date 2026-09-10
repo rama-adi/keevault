@@ -1,8 +1,30 @@
 /// <reference types="vite/client" />
-import { createRootRoute, HeadContent, Link, Scripts } from "@tanstack/react-router";
+import {
+  createRootRoute,
+  HeadContent,
+  Link,
+  Scripts,
+  useRouterState,
+} from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Activity, FolderKey, KeyRound, ScrollText, Settings } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import appCss from "@/styles/app.css?url";
 
@@ -26,51 +48,91 @@ function RootDocument({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body className="bg-background text-foreground min-h-svh antialiased">
-        <div className="flex min-h-svh flex-col">
-          <AppNav />
-          <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">{children}</main>
-          <Separator />
-          <footer className="text-muted-foreground mx-auto w-full max-w-5xl px-6 py-6 text-xs">
-            keevault control plane
-          </footer>
-        </div>
+        <AppLayout>{children}</AppLayout>
         <Scripts />
       </body>
     </html>
   );
 }
 
-/**
- * Top navigation. The shadcn `sidebar` primitive is installed and available for
- * the project workspace pages, but the shell itself has too few destinations to
- * earn one.
- */
-function AppNav() {
+const destinations = [
+  { to: "/projects", label: "Projects", icon: FolderKey },
+  { to: "/boots", label: "Boot requests", icon: Activity },
+  { to: "/audit", label: "Activity log", icon: ScrollText },
+  { to: "/settings", label: "Settings", icon: Settings },
+] as const;
+
+function AppLayout({ children }: { children: ReactNode }) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  if (pathname === "/login" || pathname === "/setup") {
+    return (
+      <main className="mx-auto flex min-h-svh w-full max-w-lg flex-col justify-center gap-6 px-6 py-12">
+        <span className="text-lg font-semibold tracking-tight">keevault</span>
+        {children}
+      </main>
+    );
+  }
+  const current = destinations.find((item) => pathname.startsWith(item.to));
   return (
-    <header className="border-b">
-      <nav className="mx-auto flex w-full max-w-5xl items-center gap-4 px-6 py-4">
-        <Link to="/" className="text-sm font-semibold tracking-tight">
-          keevault
+    <SidebarProvider>
+      <AppNav pathname={pathname} />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 md:px-8">
+          <SidebarTrigger />
+          <Separator orientation="vertical" className="h-4" />
+          <span className="text-sm text-muted-foreground">Workspace</span>
+          <span className="text-muted-foreground/50">/</span>
+          <span className="text-sm font-medium">{current?.label ?? "keevault"}</span>
+        </header>
+        <main
+          id="main-content"
+          className="mx-auto w-full max-w-7xl min-w-0 flex-1 px-4 py-8 md:px-8 lg:px-12 lg:py-10"
+        >
+          {children}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
+
+function AppNav({ pathname }: { pathname: string }) {
+  const { setOpenMobile } = useSidebar();
+  return (
+    <Sidebar>
+      <SidebarHeader className="px-5 py-6">
+        <Link
+          to="/projects"
+          className="flex items-center gap-3"
+          onClick={() => setOpenMobile(false)}
+        >
+          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <KeyRound className="size-5" />
+          </span>
+          <span className="text-lg font-semibold tracking-tight">keevault</span>
         </Link>
-        <div className="flex-1" />
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/projects">Projects</Link>
-        </Button>
-        {/*
-          A plain anchor because the /boots routes belong to the bootstrap work
-          package and are not in the generated route tree yet. Turn it into a
-          `Link` once they land, so this navigates client side.
-        */}
-        <Button asChild variant="ghost" size="sm">
-          <a href="/boots">Boots</a>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/audit">Audit</Link>
-        </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/settings">Settings</Link>
-        </Button>
-      </nav>
-    </header>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup className="px-3">
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {destinations.map((item) => (
+                <SidebarMenuItem key={item.to}>
+                  <SidebarMenuButton asChild isActive={pathname.startsWith(item.to)}>
+                    <Link to={item.to} onClick={() => setOpenMobile(false)}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="px-5 py-5">
+        <span className="text-xs text-muted-foreground">keevault / control plane</span>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
