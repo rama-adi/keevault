@@ -77,11 +77,14 @@ function DocumentationPage() {
         url: "/",
       }}
       themeSwitch={{ enabled: false }}
-      sidebar={{ banner: <p className="docs-section-label">Documentation</p> }}
-      links={[
-        { text: "Homepage", url: "/", active: "url" },
-        { text: "Open vault", url: "https://vault.keevault.my.id", external: true },
-      ]}
+      sidebar={{
+        footer: (
+          <nav className="docs-sidebar-footer" aria-label="Project links">
+            <a href="/docs/why-keevault">Why Keevault</a>
+            <a href="https://vault.keevault.my.id">Open vault</a>
+          </nav>
+        ),
+      }}
       tree={data.pageTree}
     >
       <Suspense fallback={<p className="p-8">Loading documentation…</p>}>

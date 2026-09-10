@@ -1,4 +1,5 @@
 {
   "title": "Examples",
-  "pages": ["nodejs", "docker", "background-worker"]
+  "pages": ["nodejs", "docker", "background-worker"],
+  "defaultOpen": true
 }

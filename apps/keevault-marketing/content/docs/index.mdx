@@ -1,32 +1,50 @@
 ---
-title: "Developer guide"
-description: "Connect your application to Keevault and launch it with approved secrets."
+title: "Overview"
+description: "Give your application its secrets after you approve its start."
 ---
 
-Keevault supplies secrets to your application as environment variables. The
-client waits for approval before starting your command, so you can keep secret
-values out of source code, config files, and container images.
+Keevault stores your application's secrets and delivers them as environment
+variables. The client requests access, waits for a human to approve the boot,
+then starts your application with the approved environment. Your app reads its
+variables as usual; it does not need a Keevault SDK.
 
-You'll need a vault URL, an environment with your application's secrets, a
-bootstrap token, and the keevault client binary. Approving a start requires an
-admin or owner account; a teammate can approve it for you.
+## Start with your first application
 
-## Integrate your application
+Follow the [quickstart](/docs/getting-started) to add secrets, download the client,
+configure a command, and approve its first start.
 
-[Getting started](/docs/getting-started) walks through configuring
-`keevault.json`, running the client, and reading secrets in your application.
+If you only need the binary, go to [Install the client](/docs/installation).
+For a complete runnable example, choose your deployment below.
 
-For a container deployment, follow the [Docker example](/docs/examples/docker).
+| Your application                            | Walkthrough                                           |
+| ------------------------------------------- | ----------------------------------------------------- |
+| A Node.js HTTP server on Linux              | [Node.js app](/docs/examples/nodejs)                  |
+| A container, built from Linux or macOS      | [Docker](/docs/examples/docker)                       |
+| A long-running process without an HTTP port | [Background worker](/docs/examples/background-worker) |
 
-## Configure and maintain the integration
+## Understand the three parts
 
-- [Client configuration](/docs/client) covers JSON launch settings and exit codes.
-- [Managing secrets](/docs/managing-secrets) covers environment values and bootstrap tokens.
-- [Approving boots](/docs/approving-boots) explains what happens at each start or redeployment.
-- [Security basics](/docs/security) explains the limits of approval and what your application must protect.
+| Part            | What it does                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| Environment     | Holds the secret values for one deployment, such as production or staging.                |
+| Bootstrap token | Lets a client request access to one environment. It does not approve the request.         |
+| Boot            | One attempt to start your application. Each restart or redeployment needs a new approval. |
 
-## Examples
+A project groups related environments. An admin or owner manages secrets and
+approves boots in the dashboard. The person deploying an application can ask a
+teammate to approve it.
 
-- [Simple Node.js app](/docs/examples/nodejs): an HTTP server that reads `process.env`.
-- [Docker](/docs/examples/docker): build an image and approve its first start.
-- [Background worker](/docs/examples/background-worker): run a service without an HTTP port.
+## Manage a running integration
+
+[Manage secrets and access](/docs/managing-secrets) when values change or a
+deployment no longer needs access. A running process keeps the values it already
+received; restart and approve a new boot to load updated secrets.
+
+[Approve boots](/docs/approving-boots) to review requests and troubleshoot a
+client that is still waiting.
+
+## Look up details
+
+- [Client configuration](/docs/client): JSON fields, launch behavior, exit codes, and logs.
+- [Security basics](/docs/security): what approval protects and what your runtime must protect.
+- [Why Keevault](/docs/why-keevault): the background behind the project.

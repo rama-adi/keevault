@@ -1,13 +1,16 @@
 {
-  "title": "Developer docs",
+  "title": "Documentation",
   "pages": [
+    "---Start here---",
     "index",
     "getting-started",
+    "installation",
     "examples",
+    "---Manage your vault---",
     "managing-secrets",
     "approving-boots",
+    "---Reference---",
     "client",
-    "security",
-    "why-keevault"
+    "security"
   ]
 }

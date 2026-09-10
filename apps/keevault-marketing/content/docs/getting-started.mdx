@@ -1,10 +1,12 @@
 ---
-title: "Getting started"
+title: "Quickstart"
 description: "Run your application with secrets supplied by Keevault."
 ---
 
-Have your vault URL, environment ID, and bootstrap token ready. You'll also need an admin or owner account to approve the application
-start, or a teammate who can approve it.
+This guide takes an existing application from configuration to its first approved
+start. You need access to a Keevault dashboard and an admin or owner who can
+prepare the environment and approve the request. Your application runs on Linux;
+for containers, use the [Docker walkthrough](/docs/examples/docker).
 
 ## Prepare the environment
 
@@ -31,14 +33,8 @@ This downloads the latest release for your CPU architecture, checks its SHA-256
 hash, and saves executable `./keevault`. It supports Linux amd64 and arm64 and
 requires `curl` plus `sha256sum` or `shasum`.
 
-To select a published version instead:
-
-```sh
-curl -fsSL https://vault.keevault.my.id/download.sh | KEEVAULT_VER=v1.0.0 sh
-```
-
-Replace `v1.0.0` with your release tag. See [client configuration](/docs/client#download-and-verify-the-client)
-for verification details and how to inspect the script first.
+See [Install the client](/docs/installation) to choose a version, inspect the
+script, or understand checksum verification.
 
 ## Configure the command
 
@@ -87,5 +83,8 @@ Keep these values out of logs and API responses. Each new start needs its own
 approval, including restarts and redeployments. Updating a value in the vault
 does not change the environment of an already running process.
 
-See [approving boots](/docs/approving-boots) for the approval workflow and
-[client configuration](/docs/client) for other launch settings.
+## Where to go next
+
+- [Approve future boots](/docs/approving-boots), including restarts and redeployments.
+- [Update secrets or revoke access](/docs/managing-secrets) as your application changes.
+- [Look up client settings](/docs/client) and exit codes when configuring your deployment.

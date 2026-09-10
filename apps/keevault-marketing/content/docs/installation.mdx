@@ -1,0 +1,65 @@
+---
+title: "Install the client"
+description: "Download the right Linux binary and verify it before running your application."
+---
+
+## Requirements
+
+The prebuilt client supports Linux amd64 and arm64. Run the downloader where
+your application will run, from its working directory. You need `curl` and
+either `sha256sum` or `shasum`.
+
+Using Docker, including from macOS? Follow the [Docker example](/docs/examples/docker)
+to download inside a Linux build stage.
+
+## Download the latest version
+
+On Linux, run this from your application's working directory:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | sh
+```
+
+The script selects the latest release for Linux amd64 or arm64, downloads it
+from GitHub Releases, and compares its SHA-256 hash with the release catalog.
+It saves an executable `./keevault` only after verification succeeds. A failed
+download or hash check leaves an existing binary unchanged.
+
+## Choose a version
+
+To choose a version, pass its published tag to the shell running the script:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh | KEEVAULT_VER=v1.0.0 sh
+```
+
+Replace `v1.0.0` with a published version. An unset or empty `KEEVAULT_VER`, or
+`KEEVAULT_VER=latest`, selects the highest published SemVer. The version belongs
+to the `sh` process, so put it after the pipe as shown.
+
+## Inspect the script first
+
+To inspect the script before running it:
+
+```sh
+curl -fsSL https://vault.keevault.my.id/download.sh -o download-keevault.sh
+# Read download-keevault.sh before continuing.
+sh download-keevault.sh
+```
+
+## What verification checks
+
+The hash verifies the binary against the catalog served by the control plane.
+For builds that require an independently reviewed checksum, pin the release URL
+and expected SHA-256 in your build configuration too.
+
+The downloader replaces an existing regular `./keevault` file only after a
+successful hash check. It refuses directories and symlinks at that path. It does
+not start the application or request any secrets.
+
+## Next step
+
+[Run your first application](/docs/getting-started#configure-the-command) by
+creating `keevault.json` and setting your bootstrap token. You can also choose a
+complete [Node.js](/docs/examples/nodejs), [Docker](/docs/examples/docker), or
+[background worker](/docs/examples/background-worker) example.
