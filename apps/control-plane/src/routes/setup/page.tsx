@@ -1,10 +1,10 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useHydrated, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { authClient, SETUP_CLAIM_PATH } from "@/lib/auth-client";
 import { assertSetupOpen } from "@/server/auth/setup";
@@ -29,6 +29,7 @@ function fieldValue(form: HTMLFormElement, name: string): string {
 
 function SetupPage() {
   const router = useRouter();
+  const hydrated = useHydrated();
   const [stage, setStage] = useState<Stage>("form");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -58,7 +59,7 @@ function SetupPage() {
     setPending(false);
     if (registration?.error) {
       setError(
-        "The owner account was created but the passkey was not registered. Sign in is impossible until a passkey exists; recreate the vault database and run setup again.",
+        "The owner account was created but the passkey was not registered. Keep this browser session open while resolving the registration error.",
       );
       return;
     }
@@ -85,38 +86,42 @@ function SetupPage() {
             </Alert>
           )}
           <form
+            method="post"
             onSubmit={(event) => {
               event.preventDefault();
               void claimOwner(event.currentTarget);
             }}
           >
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="setup-name">Name</FieldLabel>
-                <Input id="setup-name" name="name" required autoComplete="name" />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="setup-email">Email</FieldLabel>
-                <Input id="setup-email" name="email" type="email" required autoComplete="email" />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="setup-token">Setup token</FieldLabel>
-                <Input
-                  id="setup-token"
-                  name="setupToken"
-                  type="password"
-                  required
-                  autoComplete="off"
-                />
-              </Field>
-              <Field orientation="horizontal">
-                <Button type="submit" disabled={pending || stage === "done"}>
-                  {stage === "passkey"
-                    ? "Registering passkey"
-                    : "Create owner and register passkey"}
-                </Button>
-              </Field>
-            </FieldGroup>
+            <FieldSet disabled={!hydrated || pending || stage === "done"}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="setup-name">Name</FieldLabel>
+                  <Input id="setup-name" name="name" required autoComplete="name" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="setup-email">Email</FieldLabel>
+                  <Input id="setup-email" name="email" type="email" required autoComplete="email" />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="setup-token">Setup token</FieldLabel>
+                  <Input
+                    id="setup-token"
+                    name="setupToken"
+                    type="password"
+                    required
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field orientation="horizontal">
+                  <Button type="submit" disabled={!hydrated || pending || stage === "done"}>
+                    {stage === "passkey"
+                      ? "Registering passkey"
+                      : "Create owner and register passkey"}
+                  </Button>
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+            <noscript>Enable JavaScript to create the owner and register a passkey.</noscript>
           </form>
         </CardContent>
       </Card>

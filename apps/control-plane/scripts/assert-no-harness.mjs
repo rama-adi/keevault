@@ -34,3 +34,18 @@ if (offenders.length > 0) {
   exit(1);
 }
 console.log(`No harness routes in ${ROOT}.`);
+
+// A Workers runtime import prevents the browser from hydrating any route.
+// In particular, an unhydrated setup form must never fall back to a GET.
+const clientOffenders = [];
+for await (const path of files("dist/client")) {
+  if (!path.endsWith(".js")) continue;
+  const text = await readFile(path, "utf8");
+  if (text.includes("cloudflare:")) clientOffenders.push(path);
+}
+if (clientOffenders.length > 0) {
+  console.error("The browser bundle contains a Workers runtime import:");
+  for (const path of clientOffenders) console.error(`  ${path}`);
+  exit(1);
+}
+console.log("No Workers runtime imports in dist/client.");

@@ -18,7 +18,9 @@ function externalizeWorkersModules(): Plugin {
     name: "keevault:externalize-cloudflare-modules",
     enforce: "pre",
     resolveId(id: string) {
-      return id.startsWith("cloudflare:") ? { id, external: true } : null;
+      // Reading a Workers built-in has no module side effects. Let the client
+      // tree-shake imports left unused after Start removes server handlers.
+      return id.startsWith("cloudflare:") ? { id, external: true, moduleSideEffects: false } : null;
     },
   };
 }
