@@ -27,6 +27,7 @@ import {
   listEnvironmentKeys,
   listEnvironmentsByProject,
   listPendingBootRequestsByEnvironment,
+  listBootHistory,
   listProjects,
   listRecentBootRequestsByEnvironment,
   listSecretMetadata,
@@ -427,6 +428,65 @@ describe("boot requests", () => {
     const canceled = await getBootRequest(db, "boot_A");
     expect(canceled?.status).toBe("CANCELED");
     expect(canceled?.canceledAt).toBe(LATER);
+  });
+
+  test("history contains every non-pending status with labels and safe metadata", async () => {
+    await seedEnvironment();
+    await seedToken();
+    await seedBoot("boot_pending");
+    const statuses = [
+      "APPROVED",
+      "DELIVERED",
+      "CONSUMED",
+      "DECLINED",
+      "EXPIRED",
+      "CANCELED",
+    ] as const;
+    for (const status of statuses) {
+      await seedBoot(`boot_${status}`);
+      await updateBootRequestStatus(db, { bootId: `boot_${status}`, status, now: LATER });
+    }
+    const page = await listBootHistory(db, null);
+    expect(page.boots).toHaveLength(6);
+    expect(page.nextCursor).toBeNull();
+    expect(new Set(page.boots.map((boot) => boot.status))).toEqual(new Set(statuses));
+    expect(page.boots[0]).toEqual({
+      id: "boot_EXPIRED",
+      status: "EXPIRED",
+      projectName: "Acme",
+      environmentName: "Production",
+      tokenLabel: "zeabur-prod-1",
+      sourceIp: "203.0.113.44",
+      claimedGitCommit: "a".repeat(40),
+      createdAt: NOW,
+      updatedAt: LATER,
+    });
+    await revokeBootstrapToken(db, { tokenRowId: TOKEN_ROW_ID, now: LATER });
+    expect((await listBootHistory(db, null)).boots).toHaveLength(6);
+  });
+
+  test("history paginates tied timestamps without gaps when newer requests arrive", async () => {
+    await seedEnvironment();
+    await seedToken();
+    expect(await listBootHistory(db, null)).toEqual({ boots: [], nextCursor: null });
+    for (let index = 0; index < 28; index += 1) {
+      const id = `boot_${String(index).padStart(3, "0")}`;
+      await seedBoot(id);
+      await updateBootRequestStatus(db, { bootId: id, status: "CONSUMED", now: LATER });
+    }
+    const first = await listBootHistory(db, null);
+    expect(first.boots).toHaveLength(25);
+    expect(first.nextCursor).toEqual({ createdAt: NOW, id: "boot_003" });
+    await seedBoot("boot_new");
+    await updateBootRequestStatus(db, { bootId: "boot_new", status: "DECLINED", now: LATER });
+    await db
+      .prepare("UPDATE boot_requests SET created_at = ? WHERE id = 'boot_new'")
+      .bind(LATER)
+      .run();
+    const second = await listBootHistory(db, first.nextCursor);
+    expect(second.boots.map((boot) => boot.id)).toEqual(["boot_002", "boot_001", "boot_000"]);
+    expect(second.nextCursor).toBeNull();
+    expect((await listBootHistory(db, null)).boots[0]?.id).toBe("boot_new");
   });
 
   test("status values are constrained", async () => {

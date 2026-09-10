@@ -253,3 +253,64 @@ export async function cancelBootRequestsForToken(
       .bind(input.now, input.now, input.bootstrapTokenId),
   );
 }
+
+const bootHistoryRowSchema = z.object({
+  id: z.string(),
+  status: bootStatusColumn,
+  projectName: z.string(),
+  environmentName: z.string(),
+  tokenLabel: z.string(),
+  sourceIp: nullableTextColumn,
+  claimedGitCommit: nullableTextColumn,
+  createdAt: timestampColumn,
+  updatedAt: timestampColumn,
+});
+
+export type BootHistoryRow = z.infer<typeof bootHistoryRowSchema>;
+
+export interface BootHistoryCursor {
+  createdAt: string;
+  id: string;
+}
+
+export interface BootHistoryPage {
+  boots: BootHistoryRow[];
+  nextCursor: BootHistoryCursor | null;
+}
+
+/** Read retained non-pending requests without requiring a live Durable Object. */
+export async function listBootHistory(
+  db: VaultDatabase,
+  before: BootHistoryCursor | null,
+): Promise<BootHistoryPage> {
+  const rows = await selectMany(
+    db
+      .prepare(`
+      SELECT b.id, b.status, p.name AS projectName, e.name AS environmentName,
+             t.label AS tokenLabel, b.source_ip AS sourceIp,
+             b.claimed_git_commit AS claimedGitCommit,
+             b.created_at AS createdAt, b.updated_at AS updatedAt
+      FROM boot_requests b
+      JOIN environments e ON e.id = b.environment_id
+      JOIN projects p ON p.id = e.project_id
+      JOIN bootstrap_tokens t ON t.id = b.bootstrap_token_id
+      WHERE b.status != 'PENDING'
+        AND (? IS NULL OR b.created_at < ? OR (b.created_at = ? AND b.id < ?))
+      ORDER BY b.created_at DESC, b.id DESC
+      LIMIT 26
+    `)
+      .bind(
+        before?.createdAt ?? null,
+        before?.createdAt ?? null,
+        before?.createdAt ?? null,
+        before?.id ?? null,
+      ),
+    bootHistoryRowSchema,
+  );
+  const boots = rows.slice(0, 25);
+  const last = boots.at(-1);
+  return {
+    boots,
+    nextCursor: rows.length > 25 && last ? { createdAt: last.createdAt, id: last.id } : null,
+  };
+}

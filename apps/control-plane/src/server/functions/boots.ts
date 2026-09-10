@@ -16,6 +16,8 @@ import {
   getEnvironment,
   getProjectById,
   listEnvironmentsByProject,
+  listBootHistory,
+  type BootHistoryPage,
   listPendingBootRequestsByEnvironment,
   listProjects,
   updateBootRequestStatus,
@@ -400,5 +402,19 @@ export const cancelBootFn = createServerFn({ method: "POST" })
             reason: data.reason.length === 0 ? "canceled by an administrator" : data.reason,
           }),
         );
+      }),
+  );
+
+export const listBootHistoryFn = createServerFn({ method: "GET" })
+  .validator(
+    z.object({
+      before: z.object({ createdAt: z.iso.datetime(), id: bootIdSchema }).nullable(),
+    }),
+  )
+  .handler(
+    async ({ data }): Promise<BootHistoryPage> =>
+      await guarded(async () => {
+        await requireSession();
+        return listBootHistory(fromD1(env.VAULT_DB), data.before);
       }),
   );
