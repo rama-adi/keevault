@@ -65,6 +65,31 @@ architecture and the version matching `latest`, then download the direct URL.
 The endpoint performs no GitHub API calls. Hashes are supplied by trusted CI;
 the control plane does not independently download or attest the binaries.
 
+## Download into the current directory
+
+On Linux, download and verify the latest binary:
+
+```bash
+curl -fsSL https://vault.keevault.my.id/download.sh | sh
+```
+
+Select a version with `KEEVAULT_VER` on the shell receiving the script:
+
+```bash
+curl -fsSL https://vault.keevault.my.id/download.sh | KEEVAULT_VER=v1.0.0 sh
+```
+
+The script detects amd64 or arm64, downloads the matching GitHub asset, checks
+its SHA-256 against the database catalog, and saves an executable `./keevault`.
+It requires `curl` and either `sha256sum` or `shasum`. No JSON parser is needed;
+the endpoint includes the current catalog in the script. An unset or empty
+`KEEVAULT_VER`, or `latest`, selects the highest published SemVer.
+
+Failed downloads and checksum mismatches leave an existing binary unchanged.
+A successful download replaces an existing regular `./keevault` file. Directory
+and symlink destinations are rejected. macOS and other operating systems are
+currently unsupported because releases contain Linux binaries only.
+
 ## Build and consume
 
 To build locally without publishing:

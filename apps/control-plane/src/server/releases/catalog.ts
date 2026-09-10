@@ -61,16 +61,17 @@ export function compareVersions(left: string, right: string): number {
   return 0;
 }
 
-async function catalog(db: VaultDatabase): Promise<Response> {
+export async function readBinaryCatalog(db: VaultDatabase) {
   const result = await db
     .prepare("SELECT id, version, arch, hash, createdat, url FROM binary_releases")
     .all();
   const binaries = z.array(rowSchema).parse(result.results);
   binaries.sort((a, b) => compareVersions(b.version, a.version) || a.arch.localeCompare(b.arch));
-  return Response.json(
-    { latest: binaries[0]?.version ?? null, binaries },
-    { headers: { "Cache-Control": "no-store" } },
-  );
+  return { latest: binaries[0]?.version ?? null, binaries };
+}
+
+async function catalog(db: VaultDatabase): Promise<Response> {
+  return Response.json(await readBinaryCatalog(db), { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function handleBinaryRequest(request: Request, env: ReleaseEnv): Promise<Response> {
