@@ -133,6 +133,13 @@ go vet ./...
 go test ./...
 ```
 
+## Hosted applications
+
+- Marketing and documentation: https://keevault.my.id
+- Vault API and operator dashboard: https://vault.keevault.my.id
+
+Both Cloudflare Workers deploy from `master` in `rama-adi/keevault`. The vault build checks that test harness routes are excluded, then applies D1 migrations before deploying. Complete first-owner enrollment at `https://vault.keevault.my.id/setup` using the production setup token and your passkey.
+
 ## Further reading
 
 User documentation is served by `apps/keevault-marketing` at `/docs`.
